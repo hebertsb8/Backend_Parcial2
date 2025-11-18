@@ -1,0 +1,8 @@
+# Variables de entorno CORRECTAS para Railway
+# Copia y pega estas en tu Railway Dashboard → Variables
+
+ALLOWED_HOSTS=backendparcial2-production.up.railway.app,*.up.railway.app,*.railway.app,localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=https://backendparcial2-production.up.railway.app
+SECURE_SSL_REDIRECT=False
+
+# Las demás variables ya están bien configuradas
