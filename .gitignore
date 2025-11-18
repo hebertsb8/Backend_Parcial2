@@ -112,7 +112,10 @@ ml_models/*.pkl
 ml_models/*.joblib
 ml_models/*.h5
 ml_models/*.pb
+ml_models/sales_scaler.pkl
+ml_models/recommender_model.pkl
 !ml_models/models_metadata.json
+!ml_models/training_config.json
 
 # Misc backups
 *.bak

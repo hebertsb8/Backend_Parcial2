@@ -119,26 +119,56 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-# Database
+# Database Configuration
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# Intentar usar PostgreSQL primero (producción), fallback a SQLite (desarrollo)
+DATABASE_URL = config('DATABASE_URL', default=None)
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': config('DB_NAME'),
-#         'USER': config('DB_USER'),
-#         'PASSWORD': config('DB_PASSWORD'),
-#         'HOST': config('DB_HOST'),
-#         'PORT': config('DB_PORT'),
-#     }
-# }
+if DATABASE_URL:
+    # Usar PostgreSQL si DATABASE_URL está configurada (producción)
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+        )
+    }
+else:
+    # Fallback a configuración individual de PostgreSQL
+    try:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': config('DB_NAME', default='railway'),
+                'USER': config('DB_USER', default='postgres'),
+                'PASSWORD': config('DB_PASSWORD', default='cYpvNcrPVGUMNXKVgkVxeJfEkPJHPbFq'),
+                'HOST': config('DB_HOST', default='nozomi.proxy.rlwy.net'),
+                'PORT': config('DB_PORT', default='40214'),
+                'OPTIONS': {
+                    'connect_timeout': 10,
+                    'sslmode': 'require' if not DEBUG else 'prefer',
+                },
+                'CONN_MAX_AGE': 60,
+            }
+        }
+        # Verificar que PostgreSQL esté disponible
+        import psycopg2
+        psycopg2.connect(
+            dbname=config('DB_NAME', default='railway'),
+            user=config('DB_USER', default='postgres'),
+            password=config('DB_PASSWORD', default='cYpvNcrPVGUMNXKVgkVxeJfEkPJHPbFq'),
+            host=config('DB_HOST', default='nozomi.proxy.rlwy.net'),
+            port=config('DB_PORT', default='40214')
+        ).close()
+    except (ImportError, Exception) as e:
+        # Fallback a SQLite si PostgreSQL no está disponible
+        print(f"PostgreSQL no disponible ({e}), usando SQLite como alternativa")
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
 # Cache configuration for ML predictions
 # Usar LocMemCache por defecto (no requiere Redis)

@@ -1,53 +1,283 @@
-# 🚀 Guía de Despliegue en Producción - Railway + PostgreSQL
+# 🚀 Guía Completa de Despliegue en Producción
 
-## Problema Resuelto
+## 🎯 Visión General
 
-El generador de datos sintéticos no asignaba stock correctamente a los productos al importar la base de datos en producción. Los productos se importaban con `stock = 0` o `NULL`.
+Esta guía cubre el despliegue completo del backend Django con:
+- ✅ PostgreSQL (Railway)
+- ✅ Configuración de credenciales en base64
+- ✅ Modelos ML entrenados
+- ✅ Variables de entorno para producción
+- ✅ Archivos de configuración para múltiples plataformas
 
-## Solución Implementada
+## 📋 Requisitos Previos
 
-### 1. Modificaciones al Generador de Datos Sintéticos
+- Python 3.11+
+- PostgreSQL (Railway recomendado)
+- Redis (opcional, para cache)
+- Cuentas en servicios externos:
+  - Firebase (notificaciones push)
+  - Stripe (pagos)
+  - Google Cloud (opcional, Speech-to-Text)
 
-- **`sales/ml_data_generator.py`**: Actualizado para manejar casos donde `stock` es `NULL` (común en PostgreSQL)
-- **Reducción de stock deshabilitada**: El generador ya no reduce el stock real al crear órdenes históricas
+## 🔧 Configuración de Variables de Entorno
 
-### 2. Nuevo Comando de Management
-
+### 1. Template de Producción
+Copia el template incluido en el repositorio:
 ```bash
-python manage.py update_product_stock
+cp .env.production.template .env
 ```
 
-Actualiza el stock de todos los productos existentes con valores aleatorios realistas.
+### 2. Variables Esenciales
 
-### 3. Script de Setup Automático
-
+#### Base de Datos (Railway PostgreSQL)
 ```bash
-./scripts/setup_production.sh
+DATABASE_URL=postgresql://postgres:cYpvNcrPVGUMNXKVgkVxeJfEkPJHPbFq@nozomi.proxy.rlwy.net:40214/railway
 ```
 
-Ejecuta todo el setup necesario después de importar la base de datos.
+#### Django Settings
+```bash
+SECRET_KEY=tu_clave_secreta_unica_para_produccion_2025
+DEBUG=False
+ALLOWED_HOSTS=tu-dominio.com,tu-app.onrender.com,*
+```
+
+#### Stripe (Producción)
+```bash
+STRIPE_PUBLIC_KEY=pk_live_XXXXXXXXXXXXXXXXXX
+STRIPE_SECRET_KEY=sk_live_XXXXXXXXXXXXXXXXXX
+STRIPE_WEBHOOK_SECRET=whsec_XXXXXXXXXXXXXXXXXX
+```
+
+#### Firebase
+```bash
+FIREBASE_CREDENTIALS_PATH=./firebase-credentials-production.json
+FIREBASE_PUBLIC_API_KEY=XXXXXXXXXXXXXXXXXX
+FIREBASE_AUTH_DOMAIN=tu-proyecto.firebaseapp.com
+FIREBASE_PROJECT_ID=tu-project-id
+FIREBASE_STORAGE_BUCKET=tu-proyecto.firebasestorage.app
+FIREBASE_MESSAGING_SENDER_ID=XXXXXXXXXXXX
+```
+
+## 🗄️ Configuración de Credenciales Codificadas
+
+### 1. Firebase Credentials en Base64
+```bash
+# 1. Obtener credenciales de Firebase Console
+# 2. Codificar en base64
+base64 firebase-credentials.json > firebase_credentials_base64.txt
+
+# 3. El contenido codificado se usa en la variable de entorno
+FIREBASE_CREDENTIALS_BASE64=ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIs...
+```
+
+### 2. Google Cloud Credentials (opcional)
+```bash
+base64 google-cloud-credentials.json > gcp_credentials_base64.txt
+```
+
+## 🚀 Opciones de Despliegue
+
+### Opción 1: Railway (Recomendado)
+1. Conecta tu repositorio GitHub a Railway
+2. Railway detectará automáticamente `railway.toml`
+3. Configura variables de entorno en Railway Dashboard
+4. El despliegue se ejecuta automáticamente
+
+### Opción 2: Render
+```yaml
+# render.yaml
+services:
+  - type: web
+    name: backend-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
+```
+
+### Opción 3: Heroku
+```bash
+heroku create tu-app-name
+heroku config:set VARIABLE=valor
+git push heroku main
+```
+
+### Opción 4: VPS Manual
+```bash
+# Usar el script incluido
+bash deploy_production.sh
+```
+
+## 🤖 Modelos de Machine Learning
+
+### Entrenamiento Automático
+```bash
+# Entrenar modelos ML
+python train_ml_models.py
+
+# O usar el comando de Django
+python manage.py ml_train
+```
+
+### Modelos Incluidos
+- ✅ **Predictor de Ventas**: Regresión lineal con features temporales
+- ✅ **Recomendador de Productos**: Basado en similitud coseno
+- ✅ **Datos de Entrenamiento**: Generados automáticamente
+
+### Reentrenamiento
+Los modelos se reentrenan automáticamente cada 7 días si `ENABLE_ML_TRAINING=True`.
+
+## 📊 Problema Resuelto - Stock de Productos
+
+### Issue Original
+El generador de datos sintéticos no asignaba stock correctamente en PostgreSQL.
+
+### Solución Implementada
+- **`sales/ml_data_generator.py`**: Maneja casos `NULL` en PostgreSQL
+- **Comando nuevo**: `python manage.py update_product_stock`
+- **Script automático**: `./scripts/setup_production.sh`
+
+## 🔒 Checklist de Seguridad para Producción
+
+- [ ] `DEBUG = False`
+- [ ] `SECRET_KEY` única y segura
+- [ ] `ALLOWED_HOSTS` configurados correctamente
+- [ ] Credenciales de producción activas
+- [ ] SSL/HTTPS habilitado
+- [ ] Base de datos PostgreSQL configurada
+- [ ] Archivos estáticos recopilados
+- [ ] Modelos ML entrenados y funcionales
+
+### Comando de Verificación
+```bash
+python manage.py check --deploy
+```
 
 ## 📋 Pasos para Despliegue en Railway
 
-### 1. Exportar Base de Datos Local
-
+### 1. Preparar Base de Datos
 ```bash
-# Crear backup de SQLite
+# Backup local si es necesario
 cp db.sqlite3 db_backup.sqlite3
 
-# O exportar a SQL si es necesario
-python manage.py dumpdata > data.json
+# O exportar datos
+python manage.py dumpdata > data_backup.json
 ```
 
 ### 2. Configurar Railway
-
 - Crear proyecto en Railway
 - Configurar PostgreSQL database
-- Configurar variables de entorno:
+- Variables de entorno requeridas:
   ```
   DATABASE_URL=postgresql://...
   SECRET_KEY=tu_secret_key_segura
   DEBUG=False
+  ALLOWED_HOSTS=tu-app.up.railway.app
+  ```
+
+### 3. Despliegue Automático
+Railway detectará los archivos de configuración y ejecutará:
+- Instalación de dependencias
+- Migraciones de base de datos
+- Recopilación de archivos estáticos
+- Entrenamiento de modelos ML (opcional)
+
+## 🆘 Solución de Problemas
+
+### Error de Base de Datos
+```bash
+# Verificar conexión
+python manage.py dbshell
+
+# Ejecutar migraciones
+python manage.py migrate
+
+# Verificar estado
+python manage.py showmigrations
+```
+
+### Error de Credenciales
+```bash
+# Test Firebase
+python -c "import firebase_admin; print('Firebase OK')"
+
+# Test Stripe
+python -c "import stripe; print('Stripe OK')"
+```
+
+### Error de Modelos ML
+```bash
+# Reentrenar
+python train_ml_models.py
+
+# Verificar archivos
+ls -la ml_models/
+```
+
+## 📊 Monitoreo y Logs
+
+### Railway
+```bash
+railway logs
+```
+
+### Heroku
+```bash
+heroku logs -a tu-app-name
+```
+
+### Health Check Endpoint
+```bash
+curl https://tu-dominio.com/api/health/
+```
+
+## 🔄 Actualizaciones
+
+### Código
+```bash
+git add .
+git commit -m "feat: Nueva funcionalidad"
+git push origin main
+```
+
+### Dependencias
+```bash
+pip install --upgrade -r requirements.txt
+pip freeze > requirements.txt
+git add requirements.txt
+git commit -m "chore: Actualizar dependencias"
+git push origin main
+```
+
+## 📁 Archivos de Configuración Incluidos
+
+- ✅ `.env.production.template` - Template de variables de entorno
+- ✅ `railway.toml` - Configuración para Railway
+- ✅ `Procfile` - Configuración para Heroku
+- ✅ `runtime.txt` - Versión de Python
+- ✅ `deploy_production.sh` - Script de despliegue
+- ✅ `create_production_credentials.py` - Generador de credenciales
+- ✅ `train_ml_models.py` - Entrenador de modelos ML
+- ✅ `firebase-credentials-production.json` - Credenciales de Firebase
+- ✅ `google-cloud-credentials-production.json` - Credenciales de GCP
+
+## 🎯 Checklist Final
+
+- [ ] Repositorio conectado a plataforma de despliegue
+- [ ] Variables de entorno configuradas con valores reales
+- [ ] Credenciales de producción codificadas en base64
+- [ ] Base de datos PostgreSQL funcionando
+- [ ] Modelos ML entrenados y guardados
+- [ ] Archivos estáticos recopilados
+- [ ] HTTPS/SSL habilitado
+- [ ] Tests ejecutados en entorno de producción
+- [ ] Monitoreo configurado
+- [ ] Backup de base de datos realizado
+
+---
+
+¡Tu aplicación backend está completamente preparada para producción! 🚀
+
+**URL del repositorio**: https://github.com/hebertsb/Backend_Parcial2
   # Otras variables necesarias
   ```
 

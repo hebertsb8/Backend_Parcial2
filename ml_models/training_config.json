@@ -1,0 +1,37 @@
+{
+  "training": {
+    "enabled": true,
+    "auto_retrain": true,
+    "retrain_interval_days": 7,
+    "min_samples_for_training": 100,
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "models": {
+    "sales_predictor": {
+      "type": "linear_regression",
+      "features": [
+        "month",
+        "day_of_week",
+        "season",
+        "product_category"
+      ],
+      "target": "sales_amount"
+    },
+    "product_recommender": {
+      "type": "collaborative_filtering",
+      "similarity_metric": "cosine",
+      "min_ratings_per_user": 5
+    }
+  },
+  "data_sources": {
+    "historical_sales": "./ml_models/training_data/historical_sales.csv",
+    "product_data": "./ml_models/training_data/products.csv",
+    "user_behavior": "./ml_models/training_data/user_behavior.csv"
+  },
+  "model_paths": {
+    "sales_model": "./ml_models/sales_model.pkl",
+    "recommender_model": "./ml_models/recommender_model.pkl",
+    "scaler": "./ml_models/scaler.pkl"
+  }
+}
