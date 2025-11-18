@@ -3,6 +3,7 @@
 ## 🎯 Visión General
 
 Esta guía cubre el despliegue completo del backend Django con:
+
 - ✅ PostgreSQL (Railway)
 - ✅ Configuración de credenciales en base64
 - ✅ Modelos ML entrenados
@@ -22,7 +23,9 @@ Esta guía cubre el despliegue completo del backend Django con:
 ## 🔧 Configuración de Variables de Entorno
 
 ### 1. Template de Producción
+
 Copia el template incluido en el repositorio:
+
 ```bash
 cp .env.production.template .env
 ```
@@ -30,11 +33,13 @@ cp .env.production.template .env
 ### 2. Variables Esenciales
 
 #### Base de Datos (Railway PostgreSQL)
+
 ```bash
 DATABASE_URL=postgresql://postgres:cYpvNcrPVGUMNXKVgkVxeJfEkPJHPbFq@nozomi.proxy.rlwy.net:40214/railway
 ```
 
 #### Django Settings
+
 ```bash
 SECRET_KEY=tu_clave_secreta_unica_para_produccion_2025
 DEBUG=False
@@ -42,6 +47,7 @@ ALLOWED_HOSTS=tu-dominio.com,tu-app.onrender.com,*
 ```
 
 #### Stripe (Producción)
+
 ```bash
 STRIPE_PUBLIC_KEY=pk_live_XXXXXXXXXXXXXXXXXX
 STRIPE_SECRET_KEY=sk_live_XXXXXXXXXXXXXXXXXX
@@ -49,6 +55,7 @@ STRIPE_WEBHOOK_SECRET=whsec_XXXXXXXXXXXXXXXXXX
 ```
 
 #### Firebase
+
 ```bash
 FIREBASE_CREDENTIALS_PATH=./firebase-credentials-production.json
 FIREBASE_PUBLIC_API_KEY=XXXXXXXXXXXXXXXXXX
@@ -61,6 +68,7 @@ FIREBASE_MESSAGING_SENDER_ID=XXXXXXXXXXXX
 ## 🗄️ Configuración de Credenciales Codificadas
 
 ### 1. Firebase Credentials en Base64
+
 ```bash
 # 1. Obtener credenciales de Firebase Console
 # 2. Codificar en base64
@@ -71,6 +79,7 @@ FIREBASE_CREDENTIALS_BASE64=ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIs...
 ```
 
 ### 2. Google Cloud Credentials (opcional)
+
 ```bash
 base64 google-cloud-credentials.json > gcp_credentials_base64.txt
 ```
@@ -78,12 +87,14 @@ base64 google-cloud-credentials.json > gcp_credentials_base64.txt
 ## 🚀 Opciones de Despliegue
 
 ### Opción 1: Railway (Recomendado)
+
 1. Conecta tu repositorio GitHub a Railway
 2. Railway detectará automáticamente `railway.toml`
 3. Configura variables de entorno en Railway Dashboard
 4. El despliegue se ejecuta automáticamente
 
 ### Opción 2: Render
+
 ```yaml
 # render.yaml
 services:
@@ -95,6 +106,7 @@ services:
 ```
 
 ### Opción 3: Heroku
+
 ```bash
 heroku create tu-app-name
 heroku config:set VARIABLE=valor
@@ -102,6 +114,7 @@ git push heroku main
 ```
 
 ### Opción 4: VPS Manual
+
 ```bash
 # Usar el script incluido
 bash deploy_production.sh
@@ -110,6 +123,7 @@ bash deploy_production.sh
 ## 🤖 Modelos de Machine Learning
 
 ### Entrenamiento Automático
+
 ```bash
 # Entrenar modelos ML
 python train_ml_models.py
@@ -119,19 +133,23 @@ python manage.py ml_train
 ```
 
 ### Modelos Incluidos
+
 - ✅ **Predictor de Ventas**: Regresión lineal con features temporales
 - ✅ **Recomendador de Productos**: Basado en similitud coseno
 - ✅ **Datos de Entrenamiento**: Generados automáticamente
 
 ### Reentrenamiento
+
 Los modelos se reentrenan automáticamente cada 7 días si `ENABLE_ML_TRAINING=True`.
 
 ## 📊 Problema Resuelto - Stock de Productos
 
 ### Issue Original
+
 El generador de datos sintéticos no asignaba stock correctamente en PostgreSQL.
 
 ### Solución Implementada
+
 - **`sales/ml_data_generator.py`**: Maneja casos `NULL` en PostgreSQL
 - **Comando nuevo**: `python manage.py update_product_stock`
 - **Script automático**: `./scripts/setup_production.sh`
@@ -148,6 +166,7 @@ El generador de datos sintéticos no asignaba stock correctamente en PostgreSQL.
 - [ ] Modelos ML entrenados y funcionales
 
 ### Comando de Verificación
+
 ```bash
 python manage.py check --deploy
 ```
@@ -155,6 +174,7 @@ python manage.py check --deploy
 ## 📋 Pasos para Despliegue en Railway
 
 ### 1. Preparar Base de Datos
+
 ```bash
 # Backup local si es necesario
 cp db.sqlite3 db_backup.sqlite3
@@ -164,6 +184,7 @@ python manage.py dumpdata > data_backup.json
 ```
 
 ### 2. Configurar Railway
+
 - Crear proyecto en Railway
 - Configurar PostgreSQL database
 - Variables de entorno requeridas:
@@ -175,7 +196,9 @@ python manage.py dumpdata > data_backup.json
   ```
 
 ### 3. Despliegue Automático
+
 Railway detectará los archivos de configuración y ejecutará:
+
 - Instalación de dependencias
 - Migraciones de base de datos
 - Recopilación de archivos estáticos
@@ -184,6 +207,7 @@ Railway detectará los archivos de configuración y ejecutará:
 ## 🆘 Solución de Problemas
 
 ### Error de Base de Datos
+
 ```bash
 # Verificar conexión
 python manage.py dbshell
@@ -196,6 +220,7 @@ python manage.py showmigrations
 ```
 
 ### Error de Credenciales
+
 ```bash
 # Test Firebase
 python -c "import firebase_admin; print('Firebase OK')"
@@ -205,6 +230,7 @@ python -c "import stripe; print('Stripe OK')"
 ```
 
 ### Error de Modelos ML
+
 ```bash
 # Reentrenar
 python train_ml_models.py
@@ -216,16 +242,19 @@ ls -la ml_models/
 ## 📊 Monitoreo y Logs
 
 ### Railway
+
 ```bash
 railway logs
 ```
 
 ### Heroku
+
 ```bash
 heroku logs -a tu-app-name
 ```
 
 ### Health Check Endpoint
+
 ```bash
 curl https://tu-dominio.com/api/health/
 ```
@@ -233,6 +262,7 @@ curl https://tu-dominio.com/api/health/
 ## 🔄 Actualizaciones
 
 ### Código
+
 ```bash
 git add .
 git commit -m "feat: Nueva funcionalidad"
@@ -240,6 +270,7 @@ git push origin main
 ```
 
 ### Dependencias
+
 ```bash
 pip install --upgrade -r requirements.txt
 pip freeze > requirements.txt
@@ -278,8 +309,10 @@ git push origin main
 ¡Tu aplicación backend está completamente preparada para producción! 🚀
 
 **URL del repositorio**: https://github.com/hebertsb/Backend_Parcial2
-  # Otras variables necesarias
-  ```
+
+# Otras variables necesarias
+
+````
 
 ### 3. Desplegar Código
 
@@ -288,7 +321,7 @@ git push origin main
 git add .
 git commit -m "Ready for production"
 git push origin main
-```
+````
 
 ### 4. Setup en Producción
 
