@@ -14,8 +14,6 @@ SECRET_KEY = "django-insecure-production-key-change-this-in-production-2025-uniq
 DEBUG = "False"
 ALLOWED_HOSTS = "backendparcial2-production.up.railway.app,*.up.railway.app,*.railway.app,localhost,127.0.0.1"
 CORS_ALLOWED_ORIGINS = "https://backendparcial2-production.up.railway.app"
-
-[environment]
 PYTHON_VERSION = "3.11"
 
 # Variables de entorno necesarias (configurar en Railway dashboard)
