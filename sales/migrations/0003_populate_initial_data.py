@@ -21,7 +21,7 @@ def generate_initial_data(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sales', '0002_alter_order_status_usersession_auditlog'),
+        ('sales', '0004_paymentmethod_order_payment_method'),
         # Dependencias de otras apps para asegurar que sus tablas existan
         ('api', '0002_alter_profile_role'),
         ('products', '0001_initial'),

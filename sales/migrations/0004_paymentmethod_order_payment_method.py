@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sales', '0003_populate_initial_data'),
+        ('sales', '0002_alter_order_status_usersession_auditlog'),
     ]
 
     operations = [
