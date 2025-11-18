@@ -510,116 +510,122 @@ class SalesDataGenerator:
     @transaction.atomic
     def generate_demo_data(self, clear_existing: bool = False) -> Dict[str, Any]:
         """
-        Genera datos sintéticos de ventas.
-        
+        Genera datos sintéticos de ventas de manera OPTIMIZADA.
+
         Args:
             clear_existing: Si es True, elimina las órdenes existentes antes de generar
-            
+
         Returns:
             Dict con estadísticas de generación
         """
         if clear_existing:
             Order.objects.all().delete()
             print("✓ Órdenes existentes eliminadas")
-        
+
         # Preparar datos
         products = self._create_demo_products_if_needed()
         customers = self._create_demo_customers_if_needed()
         payment_methods = self._create_demo_payment_methods_if_needed()
 
-        # Crear relaciones entre productos para recomendaciones
-        self._create_related_products(products)
-        
-        print(f"✓ Usando {len(products)} productos y {len(customers)} clientes")
-        
-        # Generar ventas día por día
+        print(f"✓ Preparando datos: {len(products)} productos, {len(customers)} clientes, {len(payment_methods)} métodos de pago")
+
+        # OPTIMIZACIÓN: Generar TODOS los datos primero en memoria, luego bulk insert
+        orders_to_create = []
+        order_items_to_create = []
+
         current_date = self.start_date
         total_orders = 0
         total_revenue = Decimal('0.00')
-        
+
+        print("🚀 Generando datos de ventas en memoria...")
+
         while current_date <= self.end_date:
             daily_sales = self._generate_daily_sales_count(current_date)
-            
+
             for _ in range(daily_sales):
-                # Seleccionar cliente aleatorio
+                # Seleccionar cliente y método de pago aleatorios
                 customer = random.choice(customers)
-                
-                # Generar items
+                payment_method = random.choices(
+                    payment_methods,
+                    weights=[0.8, 0.1, 0.1]  # 80% tarjeta, 10% efectivo, 10% transferencia
+                )[0]
+
+                # Generar items para esta orden
                 items_data = self._generate_order_items(products)
-                
+
                 # Calcular total
                 order_total = sum(
-                    Decimal(str(item['quantity'])) * item['price'] 
+                    Decimal(str(item['quantity'])) * item['price']
                     for item in items_data
                 )
-                
+
                 # Fecha específica para esta orden
                 order_date = current_date + timedelta(
                     hours=random.randint(8, 20),
                     minutes=random.randint(0, 59)
                 )
-                
-                # Crear orden (auto_now_add pone la fecha actual, la actualizaremos después)
-                try:
-                    # Usar un savepoint anidado para que errores puntuales no rompan la transacción global
-                    with transaction.atomic():
-                        # Seleccionar método de pago (priorizando tarjeta para pruebas con Stripe)
-                        payment_method = random.choices(
-                            payment_methods,
-                            weights=[0.8, 0.1, 0.1]  # 80% tarjeta, 10% efectivo, 10% transferencia
-                        )[0]
-                        
-                        order = Order.objects.create(
-                            customer=customer,
-                            payment_method=payment_method,
-                            total_price=order_total,
-                            status='COMPLETED'
-                        )
-                except DatabaseError as e:
-                    # Si la tabla aún no tiene todas las columnas (migración en curso), saltar esta orden
-                    print(f"❌ ERROR creando Order: {e}")
-                    continue
-                except Exception as e:
-                    print(f"❌ ERROR inesperado creando Order: {e}")
-                    continue
-                
-                # Actualizar la fecha manualmente (by-passing auto_now_add)
-                Order.objects.filter(pk=order.pk).update(
+
+                # Crear objeto Order (aún no guardado)
+                order = Order(
+                    customer=customer,
+                    payment_method=payment_method,
+                    total_price=order_total,
+                    status='COMPLETED',
                     created_at=order_date,
                     updated_at=order_date
                 )
-                
-                # Crear items de la orden
+                orders_to_create.append(order)
+
+                # Preparar items para esta orden (se asignarán después del bulk_create)
                 for item_data in items_data:
-                    try:
-                        with transaction.atomic():
-                            OrderItem.objects.create(
-                                order=order,
-                                product=item_data['product'],
-                                quantity=item_data['quantity'],
-                                price=item_data['price']
-                            )
-                        # Reducir stock de producto (comentado para datos de demo - no reducir stock real)
-                        # try:
-                        #     p = item_data['product']
-                        #     if hasattr(p, 'stock') and p.stock >= item_data['quantity']:
-                        #         p.stock = max(0, p.stock - item_data['quantity'])
-                        #         p.save()
-                        # except Exception:
-                        #     pass
-                    except Exception as e:
-                        print(f"❌ ERROR creando OrderItem: {e}")
-                        # No abortar toda la generación
-                        continue
-                
+                    order_item = OrderItem(
+                        order=order,  # Se actualizará después
+                        product=item_data['product'],
+                        quantity=item_data['quantity'],
+                        price=item_data['price']
+                    )
+                    order_items_to_create.append((order_item, order))
+
                 total_orders += 1
                 total_revenue += order_total
-            
+
+                # Mostrar progreso cada 1000 órdenes
+                if total_orders % 1000 == 0:
+                    print(f"📊 Generadas {total_orders} órdenes en memoria...")
+
             current_date += timedelta(days=1)
-        
-        print(f"✓ Generadas {total_orders} órdenes")
-        print(f"✓ Ingresos totales: ${total_revenue:,.2f}")
-        
+
+        print(f"✅ Generadas {total_orders} órdenes en memoria")
+        print(f"💰 Ingresos totales proyectados: ${total_revenue:,.2f}")
+
+        # OPTIMIZACIÓN: Bulk insert de órdenes
+        print("💾 Insertando órdenes en base de datos...")
+        created_orders = Order.objects.bulk_create(orders_to_create, batch_size=1000)
+        print(f"✅ Insertadas {len(created_orders)} órdenes")
+
+        # OPTIMIZACIÓN: Bulk insert de items de orden
+        print("📦 Insertando items de orden...")
+        order_items_objects = []
+        for order_item, original_order in order_items_to_create:
+            # Encontrar la orden creada correspondiente
+            # Como bulk_create no preserva IDs, necesitamos mapear por contenido
+            # Usamos el índice para mapear
+            order_index = orders_to_create.index(original_order)
+            if order_index < len(created_orders):
+                order_item.order = created_orders[order_index]
+                order_items_objects.append(order_item)
+
+        # Bulk create de items
+        OrderItem.objects.bulk_create(order_items_objects, batch_size=2000)
+        print(f"✅ Insertados {len(order_items_objects)} items de orden")
+
+        print("🎉 ¡Generación completada exitosamente!")
+        print(f"📊 Estadísticas finales:")
+        print(f"   • Órdenes: {total_orders}")
+        print(f"   • Ingresos: ${total_revenue:,.2f}")
+        print(f"   • Productos: {len(products)}")
+        print(f"   • Clientes: {len(customers)}")
+
         return {
             'total_orders': total_orders,
             'total_revenue': float(total_revenue),
