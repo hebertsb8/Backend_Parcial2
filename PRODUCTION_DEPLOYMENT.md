@@ -102,7 +102,7 @@ services:
     name: backend-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
+    startCommand: bash railway_prestart.sh && python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
 ```
 
 ### Opción 3: Heroku

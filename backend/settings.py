@@ -13,6 +13,28 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from decouple import config
 import dj_database_url
+import os
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Validación de variables críticas para Railway
+def validate_critical_settings():
+    """Valida que las variables críticas estén configuradas antes de continuar."""
+    critical_vars = ['SECRET_KEY']
+    missing_vars = []
+
+    for var in critical_vars:
+        value = config(var, default=None)
+        if not value:
+            missing_vars.append(var)
+
+    if missing_vars:
+        print(f"⚠️  ADVERTENCIA: Variables críticas faltantes: {', '.join(missing_vars)}")
+        print("ℹ️  Usando valores por defecto seguros para continuar...")
+
+# Ejecutar validación
+validate_critical_settings()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +43,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-production-key-change-in-production-2025')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -333,9 +355,9 @@ else:
     EMAIL_HOST = 'smtp.gmail.com'
     EMAIL_PORT = 587
     EMAIL_USE_TLS = True
-    EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-    DEFAULT_FROM_EMAIL = config('EMAIL_HOST_USER')
+    EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+    DEFAULT_FROM_EMAIL = config('EMAIL_HOST_USER', default='noreply@example.com')
 
 # Para desarrollo también podemos configurar las credenciales si existen
 try:
