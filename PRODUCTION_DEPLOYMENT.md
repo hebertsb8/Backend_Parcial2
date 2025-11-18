@@ -102,7 +102,7 @@ services:
     name: backend-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
+    startCommand: python manage.py migrate && python manage.py collectstatic --noinput && ([ "$GENERATE_DEMO_DATA" = "true" ] && python manage.py generate_demo_sales || echo "Demo data generation skipped") && python manage.py runserver 0.0.0.0:$PORT
 ```
 
 ### Opción 3: Heroku
