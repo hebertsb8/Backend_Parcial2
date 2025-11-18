@@ -10,7 +10,8 @@ from .views import (
     UserDetailView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
-    ClientViewSet # Import the new ViewSet
+    ClientViewSet,
+    health_check # Import the new ViewSet
 )
 
 # Create a router and register our viewsets with it.
@@ -34,6 +35,9 @@ urlpatterns = [
     # --- Gestión de Usuarios (SOLO ADMINS) ---
     path('users/', UserListView.as_view(), name='user-list'),
     path('users/<int:pk>/', UserDetailView.as_view(), name='user-detail'),
+
+    # --- Health Check ---
+    path('health/', health_check, name='health-check'),
 
     # --- Gestión de Clientes (CRUD via ViewSet) ---
     path('', include(router.urls)),

@@ -214,3 +214,38 @@ class PasswordResetConfirmView(generics.GenericAPIView):
             return Response({'detail': 'Invalid token or user ID.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """
+    Endpoint de health check para verificar que la aplicación está funcionando.
+    """
+    from django.db import connection
+    from sales.models import Order
+    from products.models import Product
+
+    try:
+        # Verificar conexión a base de datos
+        cursor = connection.cursor()
+        cursor.execute("SELECT 1")
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
+
+    # Contar registros
+    try:
+        orders_count = Order.objects.count()
+        products_count = Product.objects.count()
+    except Exception:
+        orders_count = 0
+        products_count = 0
+
+    return Response({
+        'status': 'ok',
+        'timestamp': timezone.now().isoformat(),
+        'database': db_status,
+        'orders_count': orders_count,
+        'products_count': products_count,
+        'version': '1.0.0'
+    })
+

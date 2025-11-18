@@ -29,7 +29,7 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 # Leer ALLOWED_HOSTS desde la variable de entorno y manejar distintos tipos
 _allowed_hosts_raw = config(
     'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1,10.0.2.2,testserver,192.168.1.11'
+    default='localhost,127.0.0.1,10.0.2.2,testserver,192.168.1.11,backendparcial2-production.up.railway.app,*.up.railway.app'
 )
 if isinstance(_allowed_hosts_raw, str):
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
@@ -43,17 +43,18 @@ else:
 if DEBUG:
     ALLOWED_HOSTS = ['*']
 
-# Security settings for production
+# Security settings for production - Railway maneja SSL automáticamente
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # NO usar SECURE_SSL_REDIRECT=True en Railway - ellos manejan SSL
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    # Opcional: HSTS solo si Railway no lo maneja
+    # SECURE_HSTS_SECONDS = 31536000  # 1 year
+    # SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # SECURE_HSTS_PRELOAD = True
 
 # Application definition
 
