@@ -6,7 +6,14 @@ builder = "NIXPACKS"
 
 [deploy]
 # Comando de inicio usando gunicorn para producción
-startCommand = "python manage.py migrate && python manage.py collectstatic --noinput --clear && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 30"
+startCommand = "echo 'Starting Railway deployment...' && python railway_diagnostics.py && python manage.py migrate && python manage.py collectstatic --noinput --clear && echo 'Starting gunicorn...' && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 1 --timeout 30 --log-level debug"
+
+[environment]
+# Variables de entorno por defecto para Railway
+SECRET_KEY = "django-insecure-production-key-change-this-in-production-2025-unique-key"
+DEBUG = "False"
+ALLOWED_HOSTS = "backendparcial2-production.up.railway.app,*.up.railway.app,*.railway.app,localhost,127.0.0.1"
+CORS_ALLOWED_ORIGINS = "https://backendparcial2-production.up.railway.app"
 
 [environment]
 PYTHON_VERSION = "3.11"
