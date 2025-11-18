@@ -41,9 +41,11 @@ DATABASE_URL=postgresql://postgres:cYpvNcrPVGUMNXKVgkVxeJfEkPJHPbFq@nozomi.proxy
 #### Django Settings
 
 ```bash
-SECRET_KEY=tu_clave_secreta_unica_para_produccion_2025
+SECRET_KEY=django-insecure-production-key-change-this-in-production-2025-unique-key
 DEBUG=False
-ALLOWED_HOSTS=tu-dominio.com,tu-app.onrender.com,*
+ALLOWED_HOSTS=backendparcial2-production.up.railway.app,*.up.railway.app,*.railway.app
+CORS_ALLOWED_ORIGINS=https://backendparcial2-production.up.railway.app
+CORS_ALLOW_CREDENTIALS=True
 ```
 
 #### Stripe (Producción)
@@ -95,15 +97,50 @@ base64 google-cloud-credentials.json > gcp_credentials_base64.txt
 
 ### Opción 2: Render
 
-```yaml
+````yaml
 # render.yaml
+## 🚀 **Opciones de Despliegue**
+
+### Opción 1: Despliegue Rápido (Recomendado para Testing)
+```yaml
 services:
   - type: web
     name: backend-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: bash railway_prestart.sh && python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
+    startCommand: FAST_MODE=true python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
+````
+
+**Ventajas:**
+
+- ✅ Inicio en 30-60 segundos
+- ✅ Sin descarga de imágenes
+- ✅ Datos demo listos en 2-3 minutos
+
+### Opción 2: Despliegue Completo (Para Producción)
+
+```yaml
+services:
+  - type: web
+    name: backend-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
 ```
+
+**Nota:** El despliegue completo puede tardar 5-10 minutos por la descarga de imágenes.
+
+### Variables de Entorno para Optimización
+
+```bash
+# Modo rápido (sin imágenes)
+FAST_MODE=true
+
+# Para generar datos demo después del despliegue
+GENERATE_DEMO_DATA=true
+```
+
+````
 
 ### Opción 3: Heroku
 
@@ -111,7 +148,7 @@ services:
 heroku create tu-app-name
 heroku config:set VARIABLE=valor
 git push heroku main
-```
+````
 
 ### Opción 4: VPS Manual
 

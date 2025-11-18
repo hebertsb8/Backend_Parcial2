@@ -5,7 +5,8 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT"
+# Comando de inicio usando gunicorn para producción
+startCommand = "python manage.py migrate && python manage.py collectstatic --noinput --clear && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 30"
 
 [environment]
 PYTHON_VERSION = "3.11"
