@@ -399,6 +399,10 @@ FIREBASE_CREDENTIALS_PATH = config(
     default=str(BASE_DIR / 'firebase-credentials.json')
 )
 
+# Credenciales de Firebase en formato base64 (alternativa al archivo físico)
+# Útil para deployments en la nube como Railway donde no se pueden subir archivos
+FIREBASE_CREDENTIALS_BASE64 = config('FIREBASE_CREDENTIALS_BASE64', default=None)
+
 # Configuración pública de Firebase (para frontend)
 # Estas se pueden exponer al cliente ya que no son sensibles
 FIREBASE_PUBLIC_API_KEY = config('FIREBASE_PUBLIC_API_KEY', default=None)

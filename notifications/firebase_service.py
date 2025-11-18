@@ -5,6 +5,9 @@ from django.conf import settings
 from typing import List, Dict, Optional
 import logging
 import os
+import base64
+import json
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +33,8 @@ class FirebaseService:
     def initialize_firebase(self):
         """
         Inicializa la app de Firebase Admin SDK.
-        Requiere el archivo de credenciales de Firebase en la ruta especificada.
+        Requiere el archivo de credenciales de Firebase en la ruta especificada,
+        o las credenciales en base64 como alternativa.
         """
         try:
             # Verificar si ya está inicializado
@@ -40,26 +44,48 @@ class FirebaseService:
 
             # Ruta del archivo de credenciales
             cred_path = getattr(settings, 'FIREBASE_CREDENTIALS_PATH', None)
-            
-            if not cred_path:
-                logger.warning(
-                    "FIREBASE_CREDENTIALS_PATH no configurado en settings. "
-                    "Las notificaciones push no funcionarán hasta configurarlo."
-                )
-                return
-            
-            if not os.path.exists(cred_path):
-                logger.warning(
-                    f"Archivo de credenciales de Firebase no encontrado en: {cred_path}. "
-                    "Las notificaciones push no funcionarán hasta configurarlo."
-                )
+            cred_base64 = getattr(settings, 'FIREBASE_CREDENTIALS_BASE64', None)
+
+            # Intentar usar archivo físico primero
+            if cred_path and os.path.exists(cred_path):
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+                logger.info("Firebase Admin SDK inicializado correctamente desde archivo")
                 return
 
-            # Inicializar Firebase
-            cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred)
-            logger.info("Firebase Admin SDK inicializado correctamente")
-            
+            # Si no hay archivo físico, intentar usar base64
+            if cred_base64:
+                try:
+                    # Decodificar base64 y parsear JSON
+                    cred_json = base64.b64decode(cred_base64).decode('utf-8')
+                    cred_dict = json.loads(cred_json)
+
+                    # Crear archivo temporal con las credenciales
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                        json.dump(cred_dict, temp_file)
+                        temp_cred_path = temp_file.name
+
+                    # Inicializar Firebase con archivo temporal
+                    cred = credentials.Certificate(temp_cred_path)
+                    firebase_admin.initialize_app(cred)
+                    logger.info("Firebase Admin SDK inicializado correctamente desde base64")
+
+                    # Limpiar archivo temporal (opcional, se eliminará al terminar el proceso)
+                    # os.unlink(temp_cred_path)  # Comentado para debugging si es necesario
+
+                    return
+
+                except Exception as e:
+                    logger.error(f"Error al decodificar credenciales base64: {str(e)}")
+                    return
+
+            # Si no hay credenciales disponibles
+            logger.warning(
+                "Ni archivo de credenciales ni base64 configurados. "
+                "Las notificaciones push no funcionarán hasta configurarlo."
+            )
+            return
+
         except Exception as e:
             logger.error(f"Error al inicializar Firebase Admin SDK: {str(e)}")
 
