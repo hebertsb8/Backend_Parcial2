@@ -5,4 +5,11 @@ ALLOWED_HOSTS=backendparcial2-production.up.railway.app,*.up.railway.app,*.railw
 CORS_ALLOWED_ORIGINS=https://backendparcial2-production.up.railway.app
 SECURE_SSL_REDIRECT=False
 
+# ⚠️  IMPORTANTE: Configura estas claves MANUALMENTE en Railway Dashboard
+# NO las copies de archivos del repositorio - usa tus propias claves seguras
+#
+# STRIPE_PUBLIC_KEY=tu_clave_publica_de_stripe_aqui
+# STRIPE_SECRET_KEY=tu_clave_secreta_de_stripe_aqui
+# STRIPE_WEBHOOK_SECRET=tu_webhook_secret_de_stripe_aqui
+
 # Las demás variables ya están bien configuradas
