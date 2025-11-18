@@ -153,7 +153,30 @@
       },
       "notes": "Re-entrenamiento autom\u00e1tico",
       "file_size_mb": 0.04
+    },
+    {
+      "version": "20251116_200817",
+      "filename": "sales_model_20251116_200817.pkl",
+      "saved_at": "2025-11-16T20:08:17.328039",
+      "metrics": {
+        "training_samples": 1096,
+        "start_date": "2022-11-18",
+        "end_date": "2025-11-17",
+        "total_sales": 23379485.0,
+        "average_daily_sales": 21331.64689781022,
+        "std_daily_sales": 9280.076301762243,
+        "min_daily_sales": 4455.0,
+        "max_daily_sales": 66595.0,
+        "trained_at": "2025-11-17T00:08:17.277822+00:00",
+        "mae": 6349.111520012384,
+        "rmse": 7879.291511881233,
+        "mape": 36.56805120462923,
+        "r2_score": 0.2784479285573286
+      },
+      "notes": "Re-entrenamiento autom\u00e1tico",
+      "file_size_mb": 0.08,
+      "algorithm": "linear"
     }
   ],
-  "current_model": "20251028_170109"
+  "current_model": "20251116_200817"
 }

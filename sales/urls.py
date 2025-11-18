@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     CartView, CartItemView, StripeCheckoutView, StripeWebhookView, CompleteOrderView, 
     ManualOrderCompletionView, SalesHistoryView, SalesHistoryDetailView, GenerateOrderReceiptPDF, MyOrderListView,
-    PaymentMethodViewSet # Importar el nuevo ViewSet
+    OrderDetailsBySessionView, PaymentMethodViewSet # Importar el nuevo ViewSet
 )
 # ... (resto de importaciones)
 
@@ -74,6 +74,7 @@ urlpatterns = [
     path('sales-history/<int:pk>/', SalesHistoryDetailView.as_view(), name='sales-history-detail'),
     path('sales-history/<int:order_id>/receipt/', GenerateOrderReceiptPDF.as_view(), name='order-receipt'),
     path('my-orders/', MyOrderListView.as_view(), name='my-orders'),
+    path('order/session/<str:session_id>/', OrderDetailsBySessionView.as_view(), name='order-by-session'),
     path('debug/complete-order/', ManualOrderCompletionView.as_view(), name='debug-complete-order'),
     
     # === � REPORTES (V2.3) ===

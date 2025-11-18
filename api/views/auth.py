@@ -102,6 +102,49 @@ class UserProfileView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def post(self, request):
+        """Cambia la contraseña del usuario logueado."""
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+
+        # Validaciones
+        if not old_password or not new_password or not confirm_password:
+            return Response({
+                'error': 'Todos los campos son requeridos: old_password, new_password, confirm_password'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_password:
+            return Response({
+                'error': 'La nueva contraseña y la confirmación no coinciden'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 8:
+            return Response({
+                'error': 'La nueva contraseña debe tener al menos 8 caracteres'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verificar que la contraseña actual sea correcta
+        if not user.check_password(old_password):
+            return Response({
+                'error': 'La contraseña actual es incorrecta'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Cambiar la contraseña
+        user.set_password(new_password)
+        user.save()
+
+        # Invalidar el token actual para forzar re-login
+        try:
+            request.user.auth_token.delete()
+        except (AttributeError, Token.DoesNotExist):
+            pass
+
+        return Response({
+            'message': 'Contraseña cambiada exitosamente. Por favor, inicia sesión nuevamente.'
+        }, status=status.HTTP_200_OK)
+
 
 class PasswordResetRequestView(generics.GenericAPIView):
     """

@@ -638,7 +638,7 @@ class PaymentMethodViewSet(viewsets.ModelViewSet):
 # - Generador de reportes modular (report_generator.py)
 # - Integración con comandos de voz (voice_commands)
 # - Soporte para ML y reportes avanzados
-# 
+#
 # Ventajas del sistema unificado:
 # ✅ Código modular y reutilizable
 # ✅ Sin duplicación de lógica
@@ -646,3 +646,56 @@ class PaymentMethodViewSet(viewsets.ModelViewSet):
 # ✅ Soporte para múltiples tipos de reportes
 # ✅ Integración completa con voice_commands
 # ============================================================
+
+class OrderDetailsBySessionView(views.APIView):
+    """
+    Endpoint para obtener detalles de una orden usando el session_id de Stripe.
+    Se usa después de un pago exitoso para mostrar el comprobante.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, session_id):
+        try:
+            # Consultar la sesión de Stripe para obtener metadatos
+            import stripe
+            session = stripe.checkout.Session.retrieve(session_id)
+
+            # Obtener el order_id desde los metadatos
+            order_id = session.get('metadata', {}).get('order_id')
+            if not order_id:
+                return response.Response({
+                    'error': 'Order ID not found in session metadata'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Buscar la orden en la base de datos
+            try:
+                order = Order.objects.select_related('customer').prefetch_related(
+                    'items__product__category', 'items__product__images'
+                ).get(id=order_id, customer=request.user)
+            except Order.DoesNotExist:
+                return response.Response({
+                    'error': 'Order not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Serializar la orden
+            serializer = OrderSerializer(order)
+            order_data = serializer.data
+
+            # Agregar información adicional para el comprobante
+            order_data['session_id'] = session_id
+            order_data['stripe_payment_intent'] = session.get('payment_intent')
+            order_data['payment_status'] = session.get('payment_status')
+
+            return response.Response({
+                'success': True,
+                'order': order_data
+            }, status=status.HTTP_200_OK)
+
+        except stripe.error.StripeError as e:
+            return response.Response({
+                'error': f'Stripe error: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return response.Response({
+                'error': f'Error retrieving order: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

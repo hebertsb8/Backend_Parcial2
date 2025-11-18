@@ -240,7 +240,19 @@ class ExecutiveDashboardView(views.APIView):
             generator = AdvancedReportGenerator(params)
             report_data = generator.executive_dashboard()
             
-            return Response(report_data, status=status.HTTP_200_OK)
+            # Verificar formato
+            format_type = params.get('format', 'json')
+            if format_type == 'json':
+                return Response(report_data, status=status.HTTP_200_OK)
+            elif format_type == 'pdf':
+                return self._export_to_pdf(report_data)
+            elif format_type == 'excel':
+                return self._export_to_excel(report_data)
+            else:
+                return Response(
+                    {'error': 'Formato no soportado. Use: json, pdf, excel'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
         except Exception as e:
             return Response(
@@ -250,6 +262,88 @@ class ExecutiveDashboardView(views.APIView):
     
     def _extract_params(self, data):
         return CustomerAnalysisReportView()._extract_params(data)
+
+    def _export_to_excel(self, report_data):
+        """Exporta el dashboard ejecutivo a Excel."""
+        try:
+            output = export_to_excel(report_data)
+            
+            response = HttpResponse(
+                output.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename="dashboard_ejecutivo.xlsx"'
+            
+            return response
+        except ImportError:
+            return Response(
+                {'error': 'openpyxl no está instalado'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _export_to_pdf(self, report_data):
+        """Exporta el dashboard ejecutivo a PDF."""
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.lib import colors
+        from reportlab.platypus import Table, TableStyle
+        from reportlab.lib.units import inch
+        
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="dashboard_ejecutivo.pdf"'
+        
+        p = canvas.Canvas(response, pagesize=landscape(letter))
+        width, height = landscape(letter)
+        
+        # Título
+        p.setFont("Helvetica-Bold", 18)
+        p.drawString(50, height - 50, report_data.get('title', 'Dashboard Ejecutivo'))
+        
+        # Procesar KPIs
+        if 'kpis' in report_data:
+            y_pos = height - 80
+            p.setFont("Helvetica-Bold", 14)
+            p.drawString(50, y_pos, "KPIs Principales")
+            y_pos -= 20
+            
+            p.setFont("Helvetica", 11)
+            for key, value in report_data['kpis'].items():
+                p.drawString(50, y_pos, f"{key.replace('_', ' ').title()}: {value}")
+                y_pos -= 15
+        
+        # Procesar otras secciones
+        for section, data in report_data.items():
+            if section in ['title', 'kpis']:
+                continue
+            
+            if isinstance(data, list) and data:
+                y_pos -= 30
+                p.setFont("Helvetica-Bold", 12)
+                p.drawString(50, y_pos, section.upper())
+                y_pos -= 20
+                
+                # Crear tabla simple
+                if isinstance(data[0], dict):
+                    headers = list(data[0].keys())
+                    table_data = [headers] + [[item.get(h, '') for h in headers] for item in data[:10]]
+                    
+                    table = Table(table_data, colWidths=[1*inch] * len(headers))
+                    table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                        ('FONTSIZE', (0, 0), (-1, -1), 8),
+                    ]))
+                    
+                    table_height = table.wrap(width, height)[1]
+                    table.drawOn(p, 50, y_pos - table_height)
+        
+        p.showPage()
+        p.save()
+        
+        return response
 
 
 class InventoryAnalysisView(views.APIView):

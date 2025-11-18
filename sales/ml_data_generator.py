@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List, Dict, Any
 
+from django.core.files.base import ContentFile
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction, DatabaseError
@@ -24,17 +25,22 @@ class SalesDataGenerator:
     """
     
     def __init__(self):
-        # Generar al menos 24 meses de datos para pruebas de series temporales y predicciones
-        self.start_date = timezone.now() - timedelta(days=730)  # ~24 meses atrás
+        # Generar al menos 36 meses de datos para mejores pruebas de series temporales y predicciones
+        self.start_date = timezone.now() - timedelta(days=1095)  # ~36 meses atrás
         self.end_date = timezone.now()
         
     def _create_demo_products_if_needed(self) -> List[Product]:
-        """Crea productos de demo si no existen."""
+        """Crea productos de demo si no existen y actualiza stock de productos existentes."""
         # Verificar si ya hay productos
         existing_products = list(Product.objects.all()[:30])
-        if Product.objects.count() >= 30:
-            # Asegurar que incluso los productos existentes tengan las métricas pobladas
+        if Product.objects.count() >= 15:  # Reducir el umbral para asegurar actualización de stock
+            # Asegurar que incluso los productos existentes tengan stock y métricas pobladas
             for p in existing_products:
+                # Actualizar stock si es 0 o None
+                if p.stock == 0 or p.stock is None:
+                    stock_options = [0, 0, 0] + list(range(5, 51)) + list(range(50, 201, 25))
+                    p.stock = random.choice(stock_options)
+                    p.save()
                 self._ensure_product_metrics(p)
             return existing_products
         
@@ -57,22 +63,30 @@ class SalesDataGenerator:
             )
             categories.append(category)
         
+        # Precios ajustados para el mercado boliviano (en USD)
+        # Basados en precios reales de electrodomésticos en Bolivia:
+        # - Heladeras: 300-600 USD
+        # - Lavarropas: 200-450 USD  
+        # - Microondas: 30-120 USD
+        # - TVs: 120-400 USD
+        # - Aires acondicionados: 150-500 USD
+        # - Pequeños electrodomésticos: 30-200 USD
         products_data = [
-            {'name': 'Heladera No Frost 320L', 'price': 1500.00, 'category': categories[0], 'popularity': 0.95},
-            {'name': 'Heladera Top Mount 260L', 'price': 900.00, 'category': categories[0], 'popularity': 0.8},
-            {'name': 'Lavarropas Carga Frontal 8kg', 'price': 1100.00, 'category': categories[1], 'popularity': 0.9},
-            {'name': 'Lavarropas Carga Superior 7kg', 'price': 750.00, 'category': categories[1], 'popularity': 0.7},
-            {'name': 'Microondas 700W', 'price': 180.00, 'category': categories[2], 'popularity': 0.85},
-            {'name': 'Microondas Convección 1000W', 'price': 320.00, 'category': categories[2], 'popularity': 0.6},
-            {'name': 'Smart TV 50" 4K', 'price': 800.00, 'category': categories[3], 'popularity': 0.9},
-            {'name': 'Smart TV 32" HD', 'price': 300.00, 'category': categories[3], 'popularity': 0.7},
-            {'name': 'Cocina a Gas 4 Hornallas', 'price': 650.00, 'category': categories[4], 'popularity': 0.6},
-            {'name': 'Anafe Eléctrico 2 Placas', 'price': 220.00, 'category': categories[4], 'popularity': 0.5},
-            {'name': 'Aire Acondicionado Split 3000 Frig', 'price': 1200.00, 'category': categories[5], 'popularity': 0.8},
-            {'name': 'Aire Portátil 2000 Frig', 'price': 420.00, 'category': categories[5], 'popularity': 0.5},
-            {'name': 'Licuadora Profesional', 'price': 120.00, 'category': categories[6], 'popularity': 0.7},
-            {'name': 'Plancha Vertical', 'price': 90.00, 'category': categories[6], 'popularity': 0.4},
-            {'name': 'Aspiradora Robot', 'price': 450.00, 'category': categories[6], 'popularity': 0.6},
+            {'name': 'Heladera No Frost 320L', 'price': 450.00, 'category': categories[0], 'popularity': 0.95},
+            {'name': 'Heladera Top Mount 260L', 'price': 320.00, 'category': categories[0], 'popularity': 0.8},
+            {'name': 'Lavarropas Carga Frontal 8kg', 'price': 380.00, 'category': categories[1], 'popularity': 0.9},
+            {'name': 'Lavarropas Carga Superior 7kg', 'price': 280.00, 'category': categories[1], 'popularity': 0.7},
+            {'name': 'Microondas 700W', 'price': 65.00, 'category': categories[2], 'popularity': 0.85},
+            {'name': 'Microondas Convección 1000W', 'price': 120.00, 'category': categories[2], 'popularity': 0.6},
+            {'name': 'Smart TV 50" 4K', 'price': 350.00, 'category': categories[3], 'popularity': 0.9},
+            {'name': 'Smart TV 32" HD', 'price': 180.00, 'category': categories[3], 'popularity': 0.7},
+            {'name': 'Cocina a Gas 4 Hornallas', 'price': 220.00, 'category': categories[4], 'popularity': 0.6},
+            {'name': 'Anafe Eléctrico 2 Placas', 'price': 85.00, 'category': categories[4], 'popularity': 0.5},
+            {'name': 'Aire Acondicionado Split 3000 Frig', 'price': 420.00, 'category': categories[5], 'popularity': 0.8},
+            {'name': 'Aire Portátil 2000 Frig', 'price': 160.00, 'category': categories[5], 'popularity': 0.5},
+            {'name': 'Licuadora Profesional', 'price': 45.00, 'category': categories[6], 'popularity': 0.7},
+            {'name': 'Plancha Vertical', 'price': 35.00, 'category': categories[6], 'popularity': 0.4},
+            {'name': 'Aspiradora Robot', 'price': 180.00, 'category': categories[6], 'popularity': 0.6},
         ]
         
         # Asegurar que existan algunas marcas y garantías por defecto
@@ -108,32 +122,100 @@ class SalesDataGenerator:
                 defaults={
                     'price': Decimal(str(prod_data['price'])),
                     'category': prod_data['category'],
-                    'stock': random.randint(20, 200),
                     'description': f"Producto demo: {prod_data['name']}",
                     'brand': brand,
                     'warranty': warranty,
                 }
             )
+            # Asignar stock aleatorio si el producto es nuevo, tiene stock 0 o stock NULL
+            if created or product.stock == 0 or product.stock is None:
+                # Variar el stock: algunos productos con mucho stock, otros con poco, algunos sin stock
+                stock_options = [0, 0, 0] + list(range(5, 51)) + list(range(50, 201, 25))  # Más productos con stock
+                product.stock = random.choice(stock_options)
+                product.save()
             # Asegurar que las métricas rating/energy existan o se actualicen
             self._ensure_product_metrics(product)
             # Guardar popularidad para uso interno (anexado dinámicamente)
             setattr(product, '_popularity', prod_data.get('popularity', 0.5))
-            # Asignar imagen placeholder si no existe
+            # Asignar imagen realista basada en el nombre del producto
             try:
-                placeholder_rel = 'products/placeholder.png'
-                media_placeholder = os.path.join(settings.MEDIA_ROOT, placeholder_rel)
-                if not os.path.exists(media_placeholder):
-                    os.makedirs(os.path.dirname(media_placeholder), exist_ok=True)
-                    # Crear un PNG mínimo válido (1x1 px)
-                    png_bytes = (
-                        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\nIDATx\x9cc```\x00\x00\x00\x02\x00\x01\xe2!\xbc\x33\x00\x00\x00\x00IEND\xaeB`\x82"
-                    )
-                    with open(media_placeholder, 'wb') as f:
-                        f.write(png_bytes)
-                # Si no tiene imagen, asignar placeholder relativo (ImageField guarda ruta relativa)
+                # Si no tiene imagen, descargar imagen real de Lorem Picsum
                 if not product.image:
-                    product.image = placeholder_rel
-                    product.save()
+                    try:
+                        import requests
+                        from django.core.files.base import ContentFile
+                        
+                        # Función para generar keywords basados en el nombre del producto
+                        def get_product_keywords(product_name):
+                            name_lower = product_name.lower()
+                            keywords = []
+                            
+                            # Keywords específicas por tipo de producto
+                            if 'heladera' in name_lower or 'refrigerator' in name_lower:
+                                keywords.extend(['fridge', 'refrigerator', 'kitchen', 'appliance', 'cooling'])
+                            elif 'lavarropas' in name_lower or 'washing' in name_lower:
+                                keywords.extend(['washing', 'machine', 'laundry', 'appliance', 'clothes'])
+                            elif 'microondas' in name_lower or 'microwave' in name_lower:
+                                keywords.extend(['microwave', 'kitchen', 'appliance', 'cooking', 'electronic'])
+                            elif 'aire' in name_lower and 'acondicionado' in name_lower:
+                                keywords.extend(['air', 'conditioner', 'cooling', 'appliance', 'climate'])
+                            elif 'tv' in name_lower or 'television' in name_lower or 'smart tv' in name_lower:
+                                keywords.extend(['television', 'tv', 'entertainment', 'electronic', 'screen'])
+                            elif 'cocina' in name_lower or 'stove' in name_lower:
+                                keywords.extend(['kitchen', 'stove', 'cooking', 'appliance', 'gas'])
+                            elif 'anafe' in name_lower:
+                                keywords.extend(['stove', 'kitchen', 'cooking', 'appliance', 'electric'])
+                            elif 'licuadora' in name_lower or 'blender' in name_lower:
+                                keywords.extend(['blender', 'kitchen', 'appliance', 'mixer', 'small'])
+                            elif 'plancha' in name_lower:
+                                keywords.extend(['iron', 'clothes', 'appliance', 'laundry', 'small'])
+                            elif 'aspiradora' in name_lower or 'vacuum' in name_lower:
+                                keywords.extend(['vacuum', 'cleaner', 'appliance', 'robot', 'small'])
+                            else:
+                                # Keywords genéricas para electrodomésticos
+                                keywords.extend(['appliance', 'electronic', 'household', 'kitchen'])
+                            
+                            return keywords
+                        
+                        # Obtener keywords para este producto
+                        product_keywords = get_product_keywords(product.name)
+                        
+                        # Seleccionar 2-3 keywords aleatorias para variar las imágenes
+                        selected_keywords = random.sample(product_keywords, min(3, len(product_keywords)))
+                        
+                        # Crear URL de Lorem Picsum con keywords
+                        keyword_string = ','.join(selected_keywords)
+                        image_url = f'https://picsum.photos/400/300?random={random.randint(1, 1000)}&{keyword_string}'
+                        
+                        # Descargar la imagen
+                        response = requests.get(image_url, timeout=10)
+                        response.raise_for_status()
+                        
+                        # Crear nombre único para la imagen basado en el producto
+                        safe_name = ''.join(c for c in product.name if c.isalnum() or c in ' _-').rstrip()
+                        image_name = f"{safe_name.replace(' ', '_')}_{random.randint(1000, 9999)}.jpg"
+                        
+                        # Asignar la imagen al producto
+                        product.image.save(image_name, ContentFile(response.content), save=True)
+                        print(f"✓ Descargada imagen específica para: {product.name} (keywords: {keyword_string})")
+                        
+                    except ImportError:
+                        print(f"⚠️  requests no instalado, usando placeholder para: {product.name}")
+                        # Fallback al placeholder si requests no está disponible
+                        try:
+                            from django.conf import settings
+                            import os
+                            placeholder_path = os.path.join(settings.MEDIA_ROOT, 'products', 'placeholder.png')
+                            if os.path.exists(placeholder_path):
+                                image_name = f"product_{product.id}_placeholder.png"
+                                with open(placeholder_path, 'rb') as f:
+                                    image_content = f.read()
+                                product.image.save(image_name, ContentFile(image_content), save=True)
+                                print(f"✓ Asignada imagen placeholder a: {product.name}")
+                        except Exception as e:
+                            print(f"❌ Error con placeholder para {product.name}: {e}")
+                    except Exception as e:
+                        print(f"❌ Error descargando imagen para {product.name}: {e}")
             except Exception:
                 # No bloquear la generación si falla guardar imagen
                 pass
@@ -188,24 +270,85 @@ class SalesDataGenerator:
                 product.save()
             except Exception:
                 pass
+
+    def _create_related_products(self, products: List[Product]):
+        """
+        Crea relaciones entre productos similares para recomendaciones.
+        Por ahora solo imprime las relaciones sugeridas.
+        """
+        print("✓ Configurando productos relacionados para recomendaciones:")
+
+        # Definir relaciones lógicas entre productos
+        relations = [
+            # Heladeras similares
+            ('Heladera No Frost 320L', 'Heladera Top Mount 260L'),
+            # Lavarropas similares
+            ('Lavarropas Carga Frontal 8kg', 'Lavarropas Carga Superior 7kg'),
+            # Microondas similares
+            ('Microondas 700W', 'Microondas Convección 1000W'),
+            # TVs similares
+            ('Smart TV 50" 4K', 'Smart TV 32" HD'),
+            # Aires acondicionados similares
+            ('Aire Acondicionado Split 3000 Frig', 'Aire Portátil 2000 Frig'),
+            # Cocinas similares
+            ('Cocina a Gas 4 Hornallas', 'Anafe Eléctrico 2 Placas'),
+            # Pequeños electrodomésticos relacionados
+            ('Licuadora Profesional', 'Plancha Vertical'),
+            ('Aspiradora Robot', 'Plancha Vertical'),
+            ('Licuadora Profesional', 'Aspiradora Robot'),
+        ]
+
+        # Almacenar las relaciones en los productos como atributo temporal
+        for prod1_name, prod2_name in relations:
+            try:
+                prod1 = next((p for p in products if p.name == prod1_name), None)
+                prod2 = next((p for p in products if p.name == prod2_name), None)
+
+                if prod1 and prod2:
+                    # Almacenar relaciones como atributos temporales
+                    if not hasattr(prod1, '_related_products'):
+                        prod1._related_products = []
+                    if not hasattr(prod2, '_related_products'):
+                        prod2._related_products = []
+
+                    prod1._related_products.append(prod2)
+                    prod2._related_products.append(prod1)
+
+                    print(f"  ✓ {prod1_name} ↔ {prod2_name}")
+            except Exception as e:
+                print(f"❌ Error configurando relación {prod1_name} -> {prod2_name}: {e}")
+
+        print("✓ Relaciones de productos configuradas para recomendaciones")
     
     def _create_demo_customers_if_needed(self) -> List[User]:
-        """Crea clientes de demo si no existen."""
+        """Crea clientes de demo con datos completos si no existen."""
         # Verificar si ya hay clientes
-        clients = list(User.objects.filter(profile__role='CLIENT')[:30])
-        if len(clients) >= 15:
+        clients = list(User.objects.filter(profile__role='CLIENT')[:50])
+        if len(clients) >= 30:
             return clients
 
-        # Crear más clientes demo (hasta 30)
+        # Crear más clientes demo (hasta 50) con datos completos
         customers = []
         base_names = [
             ('Juan', 'Pérez'), ('María', 'García'), ('Carlos', 'López'), ('Ana', 'Martínez'),
             ('Luis', 'Rodríguez'), ('Sofía', 'Fernández'), ('Mateo', 'Gómez'), ('Valentina', 'Díaz'),
             ('Lucas', 'Torres'), ('Camila', 'Ruiz'), ('Diego', 'Alvarez'), ('Mía', 'Sánchez'),
             ('Martín', 'Romero'), ('Lucía', 'Ramírez'), ('Tomás', 'Vega'), ('Isabella', 'Rossi'),
+            ('Andrés', 'Morales'), ('Gabriela', 'Silva'), ('Fernando', 'Ortiz'), ('Paula', 'Castro'),
+            ('Roberto', 'Mendoza'), ('Carmen', 'Herrera'), ('José', 'Guerrero'), ('Elena', 'Flores'),
+            ('Miguel', 'Rojas'), ('Rosa', 'Paredes'), ('Antonio', 'Vargas'), ('Teresa', 'León'),
+            ('Francisco', 'Molina'), ('Patricia', 'Delgado'), ('Manuel', 'Aguilar'), ('Raquel', 'Soto'),
+            ('Ángel', 'Delgado'), ('Cristina', 'Ortega'), ('Jesús', 'Rubio'), ('Pilar', 'Moreno'),
+            ('Rafael', 'Serrano'), ('Dolores', 'Medina'), ('Javier', 'Castaño'), ('Concepción', 'Gil'),
+            ('Alberto', 'Navarro'), ('Mercedes', 'Sáez'), ('Raúl', 'Hernández'), ('Isabel', 'Gallego'),
+            ('Adrián', 'Santana'), ('Nuria', 'Iglesias'), ('Óscar', 'Cortés'), ('Montserrat', 'Lorenzo'),
         ]
+
+        phone_prefixes = ['6', '7']
+        cities = ['La Paz', 'Santa Cruz', 'Cochabamba', 'Sucre', 'Tarija', 'Potosí', 'Oruro', 'Beni', 'Pando']
+
         idx = 1
-        for first, last in base_names:
+        for first, last in base_names[:50]:  # Limitar a 50 clientes
             username = f"cliente{idx}"
             email = f"{username}@demo.com"
             user, created = User.objects.get_or_create(
@@ -216,19 +359,36 @@ class SalesDataGenerator:
                     'last_name': last,
                 }
             )
+
             if created:
                 try:
                     user.set_password('demo123')
                     user.save()
                 except Exception:
                     pass
-                # Asegurar que tenga perfil
-                if not hasattr(user, 'profile'):
-                    try:
-                        from api.models import Profile
-                        Profile.objects.create(user=user, role='CLIENT')
-                    except Exception:
-                        pass
+
+                # Crear perfil completo
+                try:
+                    from api.models import Profile
+                    phone = f"{random.choice(phone_prefixes)}{random.randint(1000000, 9999999)}"
+                    address = f"Calle {random.randint(1, 999)}, {random.choice(cities)}"
+
+                    profile, profile_created = Profile.objects.get_or_create(
+                        user=user,
+                        defaults={
+                            'role': 'CLIENT',
+                            'phone': phone,
+                            'address': address,
+                            'date_of_birth': self.start_date + timedelta(days=random.randint(365*18, 365*65)),
+                        }
+                    )
+
+                    if profile_created:
+                        print(f"✓ Creado perfil completo para: {first} {last}")
+
+                except Exception as e:
+                    print(f"❌ Error creando perfil para {first} {last}: {e}")
+
             customers.append(user)
             idx += 1
 
@@ -285,9 +445,10 @@ class SalesDataGenerator:
     def _generate_daily_sales_count(self, date: datetime) -> int:
         """
         Calcula cuántas ventas generar para un día específico.
+        Aumentado para mejores datos de entrenamiento.
         """
-        # Base: 5-15 ventas por día
-        base_sales = random.randint(5, 15)
+        # Base: 15-40 ventas por día (aumentado para mejores predicciones)
+        base_sales = random.randint(15, 40)
         
         # Aplicar multiplicadores
         seasonal = self._get_seasonal_multiplier(date)
@@ -300,7 +461,7 @@ class SalesDataGenerator:
         # Calcular ventas finales
         sales_count = int(base_sales * seasonal * trend * weekday * random_factor)
         
-        return max(1, sales_count)  # Mínimo 1 venta
+        return max(3, sales_count)  # Mínimo 3 ventas
     
     def _generate_order_items(self, products: List[Product]) -> List[Dict[str, Any]]:
         """
@@ -345,6 +506,9 @@ class SalesDataGenerator:
         # Preparar datos
         products = self._create_demo_products_if_needed()
         customers = self._create_demo_customers_if_needed()
+
+        # Crear relaciones entre productos para recomendaciones
+        self._create_related_products(products)
         
         print(f"✓ Usando {len(products)} productos y {len(customers)} clientes")
         
@@ -408,14 +572,14 @@ class SalesDataGenerator:
                                 quantity=item_data['quantity'],
                                 price=item_data['price']
                             )
-                        # Reducir stock de producto (si existe)
-                        try:
-                            p = item_data['product']
-                            if hasattr(p, 'stock') and p.stock >= item_data['quantity']:
-                                p.stock = max(0, p.stock - item_data['quantity'])
-                                p.save()
-                        except Exception:
-                            pass
+                        # Reducir stock de producto (comentado para datos de demo - no reducir stock real)
+                        # try:
+                        #     p = item_data['product']
+                        #     if hasattr(p, 'stock') and p.stock >= item_data['quantity']:
+                        #         p.stock = max(0, p.stock - item_data['quantity'])
+                        #         p.save()
+                        # except Exception:
+                        #     pass
                     except Exception as e:
                         print(f"❌ ERROR creando OrderItem: {e}")
                         # No abortar toda la generación

@@ -14,6 +14,11 @@ class Profile(models.Model):
     # El rol por defecto para nuevos usuarios será 'CLIENT'
     role = models.CharField(max_length=50, choices=Role.choices, default=Role.CLIENT)
 
+    # Campos adicionales para datos completos del cliente
+    phone = models.CharField(max_length=20, blank=True, null=True, help_text="Número de teléfono")
+    address = models.TextField(blank=True, null=True, help_text="Dirección completa")
+    date_of_birth = models.DateField(blank=True, null=True, help_text="Fecha de nacimiento")
+
     def __str__(self):
         return f'{self.user.username} - {self.role}'
 

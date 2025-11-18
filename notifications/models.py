@@ -32,6 +32,51 @@ class DeviceToken(models.Model):
         return f'{self.user.username} - {self.platform} - {self.device_name or "Sin nombre"}'
 
 
+class NotificationCampaign(models.Model):
+    """
+    Modelo para agrupar notificaciones enviadas en campañas masivas.
+    Permite rastrear el envío a múltiples usuarios y ver estadísticas.
+    """
+    class CampaignType(models.TextChoices):
+        MANUAL = 'MANUAL', 'Manual'
+        AUTOMATIC = 'AUTOMATIC', 'Automática'
+        SYSTEM = 'SYSTEM', 'Sistema'
+
+    title = models.CharField(max_length=200, help_text='Título de la campaña')
+    description = models.TextField(blank=True, null=True, help_text='Descripción de la campaña')
+    campaign_type = models.CharField(max_length=20, choices=CampaignType.choices, default=CampaignType.MANUAL)
+    
+    # Usuario que creó la campaña (admin)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='notification_campaigns')
+    
+    # Estadísticas
+    total_users = models.PositiveIntegerField(default=0, help_text='Total de usuarios objetivo')
+    successful_sends = models.PositiveIntegerField(default=0, help_text='Envíos exitosos')
+    failed_sends = models.PositiveIntegerField(default=0, help_text='Envíos fallidos')
+    
+    # Estado
+    is_completed = models.BooleanField(default=False, help_text='Campaña completada')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Campaña de Notificación'
+        verbose_name_plural = 'Campañas de Notificaciones'
+
+    def __str__(self):
+        return f'{self.title} - {self.campaign_type} ({self.successful_sends}/{self.total_users})'
+
+    def update_statistics(self):
+        """Actualiza las estadísticas basadas en las notificaciones asociadas"""
+        notifications = self.notifications.all()
+        self.successful_sends = notifications.filter(status=Notification.Status.SENT).count()
+        self.failed_sends = notifications.filter(status=Notification.Status.FAILED).count()
+        self.is_completed = True
+        self.save()
+
+
 class Notification(models.Model):
     """
     Modelo para registrar el historial de notificaciones enviadas.
@@ -61,6 +106,9 @@ class Notification(models.Model):
     
     # Firebase fields
     fcm_message_id = models.CharField(max_length=255, blank=True, null=True, help_text='ID del mensaje FCM')
+    
+    # Campaña asociada (opcional)
+    campaign = models.ForeignKey(NotificationCampaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications', help_text='Campaña a la que pertenece esta notificación')
     
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     sent_at = models.DateTimeField(null=True, blank=True)

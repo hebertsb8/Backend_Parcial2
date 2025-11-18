@@ -79,6 +79,45 @@ class Offer(models.Model):
         return f"{self.title} ({self.discount_percent}% off)"
 
 
+class ProductImage(models.Model):
+    """
+    Modelo para gestionar múltiples imágenes por producto.
+    Permite hasta 3 imágenes por producto con orden personalizado.
+    """
+    product = models.ForeignKey('Product', related_name='images', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='products/', verbose_name="Imagen del producto")
+    alt_text = models.CharField(max_length=255, blank=True, help_text="Texto alternativo para accesibilidad")
+    order = models.PositiveIntegerField(default=0, help_text="Orden de visualización (0=primera)")
+    is_main = models.BooleanField(default=False, help_text="Indica si es la imagen principal")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+        verbose_name = "Imagen de Producto"
+        verbose_name_plural = "Imágenes de Productos"
+        unique_together = ['product', 'order']  # Evita órdenes duplicados por producto
+
+    def __str__(self):
+        return f"{self.product.name} - Imagen {self.order + 1}"
+
+    def save(self, *args, **kwargs):
+        # Si es la primera imagen del producto, marcarla como principal automáticamente
+        if not ProductImage.objects.filter(product=self.product).exists():
+            self.is_main = True
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # Si eliminamos la imagen principal, marcar la siguiente como principal
+        was_main = self.is_main
+        super().delete(*args, **kwargs)
+        
+        if was_main:
+            next_image = ProductImage.objects.filter(product=self.product).first()
+            if next_image:
+                next_image.is_main = True
+                next_image.save()
+
+
 class Product(models.Model):
     category = models.ForeignKey(Category, related_name='products', on_delete=models.CASCADE)
     brand = models.ForeignKey(Brand, related_name='products', on_delete=models.SET_NULL, null=True, blank=True)
@@ -87,7 +126,7 @@ class Product(models.Model):
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     stock = models.PositiveIntegerField(default=0)
-    image = models.ImageField(upload_to='products/', blank=True, null=True)
+    # Campo image removido - ahora usamos ProductImage
 
     # Métricas adicionales para comparación y recomendaciones
     # Rating promedio (0.00 - 5.00). Nullable para compatibilidad con datos antiguos.
@@ -140,33 +179,83 @@ class Product(models.Model):
         return 0 < self.stock < 10
     
     @property
+    def main_image(self):
+        """Devuelve la imagen principal del producto"""
+        return self.images.filter(is_main=True).first() or self.images.first()
+    
+    @property
     def image_url(self):
         """
-        Devuelve la URL de la imagen si existe, None si no existe o está rota
+        Devuelve la URL de la imagen principal si existe, None si no existe
         """
-        if self.image:
-            # Verificar si el archivo existe físicamente
+        main_img = self.main_image
+        if main_img and main_img.image:
             try:
-                if os.path.isfile(self.image.path):
-                    return self.image.url
+                if os.path.isfile(main_img.image.path):
+                    return main_img.image.url
             except (ValueError, AttributeError):
                 pass
         return None
     
     @property
-    def has_valid_image(self):
-        """Verifica si el producto tiene una imagen válida"""
-        return self.image_url is not None
+    def all_image_urls(self):
+        """Devuelve una lista de todas las URLs de imágenes válidas del producto"""
+        urls = []
+        for img in self.images.all():
+            if img.image:
+                try:
+                    if os.path.isfile(img.image.path):
+                        urls.append({
+                            'url': img.image.url,
+                            'alt_text': img.alt_text or self.name,
+                            'is_main': img.is_main,
+                            'order': img.order
+                        })
+                except (ValueError, AttributeError):
+                    pass
+        return urls
     
-    def delete_image(self):
-        """Elimina la imagen física del producto"""
-        if self.image:
+    @property
+    def has_valid_image(self):
+        """Verifica si el producto tiene al menos una imagen válida"""
+        return self.main_image is not None
+    
+    def add_image(self, image_file, alt_text="", is_main=False, order=None):
+        """Agrega una nueva imagen al producto"""
+        if order is None:
+            # Obtener el próximo orden disponible
+            existing_orders = list(self.images.values_list('order', flat=True))
+            order = 0
+            while order in existing_orders:
+                order += 1
+        
+        # Si es la primera imagen, marcarla como principal
+        if not self.images.exists():
+            is_main = True
+        
+        # Si se marca como principal, quitar la marca de otras imágenes
+        if is_main:
+            self.images.update(is_main=False)
+        
+        return ProductImage.objects.create(
+            product=self,
+            image=image_file,
+            alt_text=alt_text,
+            order=order,
+            is_main=is_main
+        )
+    
+    def delete_image(self, image_id=None):
+        """Elimina una imagen específica o todas las imágenes del producto"""
+        if image_id:
             try:
-                if os.path.isfile(self.image.path):
-                    os.remove(self.image.path)
-                self.image = None
-                self.save()
+                img = self.images.get(id=image_id)
+                img.delete()
                 return True
-            except Exception:
-                pass
-        return False
+            except ProductImage.DoesNotExist:
+                return False
+        else:
+            # Eliminar todas las imágenes
+            count = self.images.count()
+            self.images.all().delete()
+            return count > 0

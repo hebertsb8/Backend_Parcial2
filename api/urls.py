@@ -26,6 +26,8 @@ urlpatterns = [
     path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
     # --- Perfil de Usuario (para el usuario logueado) ---
     path('profile/', UserProfileView.as_view(), name='user-profile'),
+    path('profile/change-password/', UserProfileView.as_view(), name='change-password'),
+    path('user/change-password/', UserProfileView.as_view(), name='change-password-user'),
     # Alias para compatibilidad con frontends que consumen /api/me/
     path('me/', UserProfileView.as_view(), name='me'),
 

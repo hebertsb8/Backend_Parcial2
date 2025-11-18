@@ -54,15 +54,20 @@ def handle_search_products(text: str, limit: int = 10) -> Dict[str, Any]:
 
 
 def handle_recommend_products(user, text: str, limit: int = 5) -> Dict[str, Any]:
-    """Recomendador simple por reglas (stock y categoría si se menciona)."""
-    # Intent: si menciona categoría, usarla
-    cat_match = re.search(r"categoria\s+de\s+(\w+)", text, flags=re.I)
+    """Recomendador simple por reglas (stock, categoría, marca y términos específicos)."""
+    # Limpiar texto de palabras comunes de recomendación
+    clean_text = re.sub(r"\b(recomi[eé]ndame|recomienda|quiero|sugiere|sugiereme|dame|muestra|muéstrame|busca|buscame|encuentra|encuéntrame)\b", "", text, flags=re.I)
+    clean_text = clean_text.strip()
+
     qs = Product.objects.filter(stock__gt=0)
+
+    # 1. Filtrar por categoría si se menciona explícitamente
+    cat_match = re.search(r"categoria\s+de\s+(\w+)", text, flags=re.I)
     if cat_match:
         cat = cat_match.group(1)
         qs = qs.filter(category__name__icontains=cat)
 
-    # Si el usuario menciona una marca explícita (p. ej. 'LG'), filtramos por esa marca
+    # 2. Filtrar por marca si se menciona explícitamente
     try:
         text_low = text.lower()
         for b in Brand.objects.filter(is_active=True):
@@ -72,6 +77,28 @@ def handle_recommend_products(user, text: str, limit: int = 5) -> Dict[str, Any]
     except Exception:
         # Silenciar errores de consulta de marcas en entornos de test sencillos
         pass
+
+    # 3. Filtrar por términos específicos de productos (palabras clave)
+    # Extraer términos potenciales (palabras de más de 3 caracteres que no sean comunes)
+    stop_words = {'una', 'unos', 'unas', 'un', 'el', 'la', 'los', 'las', 'de', 'del', 'para', 'con', 'por', 'en', 'y', 'o', 'que', 'como', 'muy', 'mas', 'más', 'menos', 'buena', 'bueno', 'buenos', 'buenas'}
+    tokens = [word for word in re.findall(r'\b\w{4,}\b', clean_text.lower()) if word not in stop_words]
+
+    if tokens and not cat_match:  # Solo filtrar por términos si no hay categoría explícita
+        # Crear filtro OR para nombre y descripción
+        from django.db.models import Q
+        name_q = Q()
+        desc_q = Q()
+
+        for token in tokens:
+            name_q |= Q(name__icontains=token)
+            desc_q |= Q(description__icontains=token)
+
+        # Aplicar el filtro OR al queryset base
+        qs = qs.filter(name_q | desc_q)
+
+    # Si no hay filtros aplicados, devolver productos populares
+    if not qs.exists() or not (cat_match or any(b.name and b.name.lower() in text_low for b in Brand.objects.filter(is_active=True)) or tokens):
+        qs = Product.objects.filter(stock__gt=0)
 
     qs = qs.order_by('-stock', '-created_at')[:limit]
     recs = []

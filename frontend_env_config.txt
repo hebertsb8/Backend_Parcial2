@@ -1,0 +1,38 @@
+# Configuración de Firebase para Frontend
+# COPIA ESTO EN TU ARCHIVO .env DEL FRONTEND
+# NO INCLUIR CREDENCIALES SENSIBLES
+
+# =============================================================================
+# FIREBASE - CONFIGURACIÓN PÚBLICA
+# =============================================================================
+# PASO 1: Ve a https://console.firebase.google.com/
+# PASO 2: Selecciona tu proyecto "smart365"
+# PASO 3: Project Settings > General > Your apps > Web app
+# PASO 4: Copia estos valores reales de Firebase Console:
+
+# API Key (apiKey) - COPIA EL VALOR REAL DE FIREBASE CONSOLE
+VITE_FIREBASE_API_KEY=AIzaSyAAD5B-ng3s7eaEsl7VQ6VLBq-sN8U31tI
+
+# Auth Domain (authDomain) - COPIA EL VALOR REAL DE FIREBASE CONSOLE
+VITE_FIREBASE_AUTH_DOMAIN=smart365-88674.firebaseapp.com
+
+# Project ID (projectId) - COPIA EL VALOR REAL DE FIREBASE CONSOLE
+VITE_FIREBASE_PROJECT_ID=smart365-88674
+
+# Storage Bucket (storageBucket) - COPIA EL VALOR REAL DE FIREBASE CONSOLE
+VITE_FIREBASE_STORAGE_BUCKET=smart365-88674.firebasestorage.app
+
+# Messaging Sender ID (messagingSenderId) - COPIA EL VALOR REAL DE FIREBASE CONSOLE
+VITE_FIREBASE_MESSAGING_SENDER_ID=126518580899
+
+# App ID (appId) - COPIA EL VALOR REAL DE FIREBASE CONSOLE
+VITE_FIREBASE_APP_ID=1:126518580899:web:a888845d118274244cd116
+
+# VAPID Key para notificaciones web push (opcional)
+# Se genera en: Cloud Messaging > Web Push certificates
+VITE_FIREBASE_VAPID_KEY=BHgppmXbVHaDQIz40L3-7FG8R2hik-6nRvvydqrz1NeZCYjBCZ8apDs46K0d3E4SVPM_w_J4rfT16e1yG0XBON0
+
+# =============================================================================
+# URL DEL BACKEND
+# =============================================================================
+VITE_API_BASE_URL=http://localhost:8000/api

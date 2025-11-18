@@ -1,0 +1,38 @@
+{
+  "api_base_url": "http://10.0.2.2:8000",
+  "api_base_url_emulator": "http://10.0.2.2:8000",
+  "api_base_url_device": "http://192.168.1.XXX:8000",
+  "api_base_url_web": "http://localhost:8000",
+
+  "endpoints": {
+    "auth": {
+      "login": "/api/auth/login/",
+      "register": "/api/auth/register/",
+      "logout": "/api/auth/logout/",
+      "profile": "/api/auth/profile/"
+    },
+    "products": {
+      "list": "/api/products/",
+      "detail": "/api/products/{id}/",
+      "categories": "/api/products/categories/",
+      "search": "/api/products/search/"
+    },
+    "sales": {
+      "cart": "/api/sales/cart/",
+      "orders": "/api/sales/orders/",
+      "checkout": "/api/sales/checkout/"
+    },
+    "notifications": {
+      "register_token": "/api/notifications/device-tokens/register/",
+      "send": "/api/notifications/notifications/send/",
+      "list": "/api/notifications/notifications/",
+      "preferences": "/api/notifications/preferences/my/"
+    }
+  },
+
+  "constants": {
+    "connect_timeout": 30000,
+    "receive_timeout": 30000,
+    "default_image_url": "https://picsum.photos/400/300?random=1&kitchen"
+  }
+}

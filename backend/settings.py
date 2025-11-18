@@ -345,6 +345,16 @@ FIREBASE_CREDENTIALS_PATH = config(
     default=str(BASE_DIR / 'firebase-credentials.json')
 )
 
+# Configuración pública de Firebase (para frontend)
+# Estas se pueden exponer al cliente ya que no son sensibles
+FIREBASE_PUBLIC_API_KEY = config('FIREBASE_PUBLIC_API_KEY', default=None)
+FIREBASE_AUTH_DOMAIN = config('FIREBASE_AUTH_DOMAIN', default=None)
+FIREBASE_PROJECT_ID = config('FIREBASE_PROJECT_ID', default=None)
+FIREBASE_STORAGE_BUCKET = config('FIREBASE_STORAGE_BUCKET', default=None)
+FIREBASE_MESSAGING_SENDER_ID = config('FIREBASE_MESSAGING_SENDER_ID', default=None)
+FIREBASE_APP_ID = config('FIREBASE_APP_ID', default=None)
+FIREBASE_VAPID_KEY = config('FIREBASE_VAPID_KEY', default=None)  # Para web push notifications
+
 # --- CONFIGURACIÓN DE GOOGLE CLOUD SPEECH-TO-TEXT ---
 # Ruta al archivo de credenciales de Google Cloud
 # Descarga el archivo desde Google Cloud Console > IAM & Admin > Service Accounts

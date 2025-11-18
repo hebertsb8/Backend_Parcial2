@@ -5,6 +5,15 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
+from django.http import HttpResponse
+from io import BytesIO
+import openpyxl
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from docx import Document
+from docx.shared import Inches
 
 from sales.ml_predictor_simple import SimpleSalesPredictor
 from sales.ml_model_manager import model_manager, get_predictor
@@ -416,7 +425,7 @@ def ml_dashboard(request):
     """
     Dashboard completo del sistema ML.
     
-    GET /api/orders/ml/dashboard/
+    GET /api/orders/ml/dashboard/?format=json|pdf|excel|word
     
     Returns:
         Resumen completo: modelo actual, predicciones, performance
@@ -453,13 +462,181 @@ def ml_dashboard(request):
             'last_updated': current_model['saved_at']
         }
         
-        return Response({
-            'success': True,
-            'data': dashboard
-        })
+        # Verificar formato
+        format_type = request.GET.get('format', 'json').lower()
+        
+        if format_type == 'json':
+            return Response({
+                'success': True,
+                'data': dashboard
+            })
+        elif format_type == 'pdf':
+            return _generate_ml_dashboard_pdf(dashboard)
+        elif format_type == 'excel':
+            return _generate_ml_dashboard_excel(dashboard)
+        elif format_type == 'word':
+            return _generate_ml_dashboard_word(dashboard)
+        else:
+            return Response(
+                {'error': 'Formato no soportado. Use: json, pdf, excel, word'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
     except Exception as e:
         return Response({
             'success': False,
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _generate_ml_dashboard_pdf(data):
+    """Genera PDF del dashboard ML"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    # Título
+    elements.append(Paragraph("Dashboard de Machine Learning", styles['Heading1']))
+    elements.append(Spacer(1, 12))
+
+    # Modelo actual
+    if 'current_model' in data:
+        elements.append(Paragraph("Modelo Actual", styles['Heading2']))
+        model_info = data['current_model']
+        elements.append(Paragraph(f"Nombre: {model_info.get('name', 'N/A')}", styles['Normal']))
+        elements.append(Paragraph(f"Tipo: {model_info.get('type', 'N/A')}", styles['Normal']))
+        elements.append(Paragraph(f"Precisión: {model_info.get('accuracy', 'N/A')}", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+    # Predicciones
+    if 'predictions_30_days' in data:
+        elements.append(Paragraph("Predicciones a 30 días", styles['Heading2']))
+        pred = data['predictions_30_days']
+        elements.append(Paragraph(f"Total predicho: {pred.get('total_predicted', 'N/A')}", styles['Normal']))
+        elements.append(Paragraph(f"Promedio diario: {pred.get('average_daily', 'N/A')}", styles['Normal']))
+        elements.append(Paragraph(f"Tasa de crecimiento: {pred.get('growth_rate', 'N/A')}%", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+    # Performance
+    if 'performance' in data and isinstance(data['performance'], dict):
+        elements.append(Paragraph("Performance Histórico", styles['Heading2']))
+        perf = data['performance']
+        table_data = [['Métrica', 'Valor']]
+        for key, value in perf.items():
+            table_data.append([str(key), str(value)])
+        
+        table = Table(table_data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(table)
+
+    doc.build(elements)
+    
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="dashboard_ml.pdf"'
+    return response
+
+
+def _generate_ml_dashboard_excel(data):
+    """Genera Excel del dashboard ML"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Dashboard ML"  # type: ignore[reportOptionalMemberAccess]
+
+    row = 1
+    # Título
+    ws.cell(row=row, column=1, value="Dashboard de Machine Learning")  # type: ignore[reportOptionalMemberAccess]
+    row += 2
+
+    # Modelo actual
+    if 'current_model' in data:
+        ws.cell(row=row, column=1, value="Modelo Actual")  # type: ignore[reportOptionalMemberAccess]
+        row += 1
+        model_info = data['current_model']
+        ws.cell(row=row, column=1, value=f"Nombre: {model_info.get('name', 'N/A')}")  # type: ignore[reportOptionalMemberAccess]
+        row += 1
+        ws.cell(row=row, column=1, value=f"Tipo: {model_info.get('type', 'N/A')}")  # type: ignore[reportOptionalMemberAccess]
+        row += 1
+        ws.cell(row=row, column=1, value=f"Precisión: {model_info.get('accuracy', 'N/A')}")  # type: ignore[reportOptionalMemberAccess]
+        row += 2
+
+    # Predicciones
+    if 'predictions_30_days' in data:
+        ws.cell(row=row, column=1, value="Predicciones a 30 días")  # type: ignore[reportOptionalMemberAccess]
+        row += 1
+        pred = data['predictions_30_days']
+        ws.cell(row=row, column=1, value=f"Total predicho: {pred.get('total_predicted', 'N/A')}")  # type: ignore[reportOptionalMemberAccess]
+        row += 1
+        ws.cell(row=row, column=1, value=f"Promedio diario: {pred.get('average_daily', 'N/A')}")  # type: ignore[reportOptionalMemberAccess]
+        row += 1
+        ws.cell(row=row, column=1, value=f"Tasa de crecimiento: {pred.get('growth_rate', 'N/A')}%")  # type: ignore[reportOptionalMemberAccess]
+        row += 2
+
+    # Performance
+    if 'performance' in data and isinstance(data['performance'], dict):
+        ws.cell(row=row, column=1, value="Performance Histórico")  # type: ignore[reportOptionalMemberAccess]
+        row += 1
+        ws.cell(row=row, column=2, value="Valor")  # type: ignore[reportOptionalMemberAccess]
+        row += 1
+        for key, value in data['performance'].items():
+            ws.cell(row=row, column=1, value=str(key))  # type: ignore[reportOptionalMemberAccess]
+            ws.cell(row=row, column=2, value=str(value))  # type: ignore[reportOptionalMemberAccess]
+            row += 1
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="dashboard_ml.xlsx"'
+    return response
+
+
+def _generate_ml_dashboard_word(data):
+    """Genera Word del dashboard ML"""
+    doc = Document()
+    doc.add_heading('Dashboard de Machine Learning', 0)
+
+    # Modelo actual
+    if 'current_model' in data:
+        doc.add_heading('Modelo Actual', level=1)
+        model_info = data['current_model']
+        doc.add_paragraph(f"Nombre: {model_info.get('name', 'N/A')}")
+        doc.add_paragraph(f"Tipo: {model_info.get('type', 'N/A')}")
+        doc.add_paragraph(f"Precisión: {model_info.get('accuracy', 'N/A')}")
+
+    # Predicciones
+    if 'predictions_30_days' in data:
+        doc.add_heading('Predicciones a 30 días', level=1)
+        pred = data['predictions_30_days']
+        doc.add_paragraph(f"Total predicho: {pred.get('total_predicted', 'N/A')}")
+        doc.add_paragraph(f"Promedio diario: {pred.get('average_daily', 'N/A')}")
+        doc.add_paragraph(f"Tasa de crecimiento: {pred.get('growth_rate', 'N/A')}%")
+
+    # Performance
+    if 'performance' in data and isinstance(data['performance'], dict):
+        doc.add_heading('Performance Histórico', level=1)
+        table = doc.add_table(rows=1, cols=2)
+        hdr_cells = table.rows[0].cells  # type: ignore[reportOptionalMemberAccess]
+        hdr_cells[0].text = 'Métrica'
+        hdr_cells[1].text = 'Valor'
+        
+        for key, value in data['performance'].items():
+            row_cells = table.add_row().cells  # type: ignore[reportOptionalMemberAccess]
+            row_cells[0].text = str(key)
+            row_cells[1].text = str(value)
+
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    response['Content-Disposition'] = 'attachment; filename="dashboard_ml.docx"'
+    return response

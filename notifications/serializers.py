@@ -1,7 +1,7 @@
 # notifications/serializers.py
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import DeviceToken, Notification, NotificationPreference
+from .models import DeviceToken, Notification, NotificationPreference, NotificationCampaign
 
 
 class DeviceTokenSerializer(serializers.ModelSerializer):
@@ -143,3 +143,42 @@ class NotificationStatsSerializer(serializers.Serializer):
     failed_count = serializers.IntegerField()
     by_type = serializers.DictField()
     recent_notifications = NotificationListSerializer(many=True)
+
+
+class NotificationCampaignSerializer(serializers.ModelSerializer):
+    """Serializer para campañas de notificaciones"""
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    success_rate = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = NotificationCampaign
+        fields = ['id', 'title', 'description', 'campaign_type', 'created_by', 
+                  'created_by_username', 'total_users', 'successful_sends', 
+                  'failed_sends', 'success_rate', 'is_completed', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'created_by_username', 'success_rate', 
+                           'successful_sends', 'failed_sends', 'is_completed', 'created_at', 'updated_at']
+
+    def get_success_rate(self, obj):
+        if obj.total_users == 0:
+            return 0
+        return round((obj.successful_sends / obj.total_users) * 100, 2)
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class NotificationCampaignListSerializer(serializers.ModelSerializer):
+    """Serializer simplificado para listar campañas"""
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    success_rate = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = NotificationCampaign
+        fields = ['id', 'title', 'campaign_type', 'total_users', 'successful_sends', 
+                  'failed_sends', 'success_rate', 'is_completed', 'created_at']
+    
+    def get_success_rate(self, obj):
+        if obj.total_users == 0:
+            return 0
+        return round((obj.successful_sends / obj.total_users) * 100, 2)

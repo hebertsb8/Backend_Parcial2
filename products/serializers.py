@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Product, Brand, Warranty, Offer
+from .models import Category, Product, Brand, Warranty, Offer, ProductImage
 class OfferSerializer(serializers.ModelSerializer):
     # mantener products (PKs) para escritura, pero exponer detalle para lectura
     products = serializers.PrimaryKeyRelatedField(many=True, queryset=Product.objects.all())
@@ -14,15 +14,9 @@ class OfferSerializer(serializers.ModelSerializer):
         products = obj.products.all()
         data = []
         for p in products:
-            # calcular image_url de forma segura
+            # calcular image_url usando la nueva propiedad image_url
             try:
-                image_url = None
-                if getattr(p, 'image', None):
-                    req = self.context.get('request')
-                    if req:
-                        image_url = req.build_absolute_uri(p.image.url)
-                    else:
-                        image_url = p.image.url
+                image_url = p.image_url
             except Exception:
                 image_url = None
 
@@ -47,6 +41,30 @@ class OfferSerializer(serializers.ModelSerializer):
             })
         return data
 import os
+
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    """
+    Serializador para las imágenes de productos.
+    """
+    image_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ProductImage
+        fields = ['id', 'image', 'image_url', 'alt_text', 'order', 'is_main', 'created_at']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_image_url(self, obj):
+        if obj.image:
+            try:
+                if os.path.isfile(obj.image.path):
+                    request = self.context.get('request')
+                    if request:
+                        return request.build_absolute_uri(obj.image.url)
+                    return obj.image.url
+            except (ValueError, AttributeError, FileNotFoundError):
+                pass
+        return None
 
 
 class WarrantySerializer(serializers.ModelSerializer):
@@ -89,7 +107,10 @@ class ProductSerializer(serializers.ModelSerializer):
     brand_detail = BrandSerializer(source='brand', read_only=True)
     warranty_detail = WarrantySerializer(source='warranty', read_only=True)
 
-    image_url = serializers.SerializerMethodField()
+    # Campos de imágenes múltiples
+    main_image_url = serializers.SerializerMethodField()
+    all_image_urls = serializers.SerializerMethodField()
+    images = ProductImageSerializer(many=True, read_only=True)
     has_valid_image = serializers.BooleanField(read_only=True)
     # Métricas nuevas expuestas al cliente
     rating = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True, allow_null=True)
@@ -113,24 +134,19 @@ class ProductSerializer(serializers.ModelSerializer):
             'warranty_detail',
             'rating',
             'energy_kwh_per_year',
-            'image',
-            'image_url',
+            'images',
+            'main_image_url',
+            'all_image_urls',
             'has_valid_image',
             'created_at',
             'updated_at'
         ]
     
-    def get_image_url(self, obj):
-        if obj.image:
-            try:
-                if os.path.isfile(obj.image.path):
-                    request = self.context.get('request')
-                    if request:
-                        return request.build_absolute_uri(obj.image.url)
-                    return obj.image.url
-            except (ValueError, AttributeError, FileNotFoundError):
-                pass
-        return None
+    def get_main_image_url(self, obj):
+        return obj.image_url
+    
+    def get_all_image_urls(self, obj):
+        return obj.all_image_urls
     
     def validate_image(self, value):
         if value:
@@ -144,13 +160,3 @@ class ProductSerializer(serializers.ModelSerializer):
                     f"Formato de imagen no válido. Use: {', '.join(valid_extensions)}"
                 )
         return value
-    
-    def update(self, instance, validated_data):
-        if 'image' in validated_data and validated_data['image']:
-            if instance.image:
-                try:
-                    if os.path.isfile(instance.image.path):
-                        os.remove(instance.image.path)
-                except Exception:
-                    pass
-        return super().update(instance, validated_data)

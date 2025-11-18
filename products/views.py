@@ -5,8 +5,9 @@ from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from .models import Category, Product, Brand, Warranty, Offer
-from .serializers import CategorySerializer, ProductSerializer, BrandSerializer, WarrantySerializer, OfferSerializer
+from django.db import models
+from .models import Category, Product, Brand, Warranty, Offer, ProductImage
+from .serializers import CategorySerializer, ProductSerializer, BrandSerializer, WarrantySerializer, OfferSerializer, ProductImageSerializer
 class OfferViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar ofertas (CRUD).
@@ -249,3 +250,109 @@ class ProductViewSet(viewsets.ModelViewSet):
             'message': f'Limpieza completada. {cleaned_count} imagen(es) rota(s) eliminada(s).',
             'cleaned_count': cleaned_count
         }, status=status.HTTP_200_OK)
+
+
+class ProductImageViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar imágenes de productos.
+    - GET: Acceso público (lectura)
+    - POST/PUT/DELETE: Solo administradores
+    """
+    queryset = ProductImage.objects.select_related('product').order_by('product', 'order')
+    serializer_class = ProductImageSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['product', 'is_main']
+    ordering_fields = ['order', 'created_at']
+    ordering = ['product', 'order']
+
+    def get_permissions(self):
+        """
+        Permisos dinámicos:
+        - Lectura (GET, HEAD, OPTIONS): Público
+        - Escritura (POST, PUT, PATCH, DELETE): Solo admins
+        """
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
+
+    def perform_create(self, serializer):
+        """Al crear una imagen, asignar el orden automáticamente si no se especifica"""
+        product = serializer.validated_data['product']
+        if 'order' not in serializer.validated_data:
+            # Obtener el máximo orden actual para este producto
+            max_order = ProductImage.objects.filter(product=product).aggregate(
+                max_order=models.Max('order')
+            )['max_order'] or 0
+            serializer.save(order=max_order + 1)
+        else:
+            serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def set_main(self, request, pk=None):
+        """Establecer esta imagen como la principal del producto"""
+        image = self.get_object()
+        product = image.product
+
+        # Quitar el flag is_main de todas las imágenes del producto
+        ProductImage.objects.filter(product=product).update(is_main=False)
+
+        # Establecer esta imagen como principal
+        image.is_main = True
+        image.save()
+
+        serializer = self.get_serializer(image)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def reorder(self, request, pk=None):
+        """Reordenar las imágenes del producto"""
+        image = self.get_object()
+        new_order = request.data.get('order')
+
+        if new_order is None:
+            return Response(
+                {'error': 'Se requiere el campo "order"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            new_order = int(new_order)
+        except ValueError:
+            return Response(
+                {'error': 'El campo "order" debe ser un número entero'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        product = image.product
+
+        # Obtener todas las imágenes del producto ordenadas
+        images = list(ProductImage.objects.filter(product=product).order_by('order'))
+
+        # Remover la imagen actual de la lista
+        current_index = None
+        for i, img in enumerate(images):
+            if img.id == image.id:
+                current_index = i
+                break
+
+        if current_index is not None:
+            images.pop(current_index)
+
+        # Insertar en la nueva posición
+        if new_order < 0:
+            new_order = 0
+        elif new_order > len(images):
+            new_order = len(images)
+
+        images.insert(new_order, image)
+
+        # Actualizar los órdenes
+        for i, img in enumerate(images):
+            if img.order != i + 1:
+                img.order = i + 1
+                img.save()
+
+        serializer = self.get_serializer(image)
+        return Response(serializer.data)

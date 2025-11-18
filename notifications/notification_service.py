@@ -1,10 +1,10 @@
 # notifications/notification_service.py
 from django.contrib.auth.models import User
 from django.utils import timezone
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import logging
 
-from .models import DeviceToken, Notification, NotificationPreference
+from .models import DeviceToken, Notification, NotificationPreference, NotificationCampaign
 from .firebase_service import firebase_service
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,8 @@ class NotificationService:
         body: str,
         notification_type: str = 'CUSTOM',
         data: Optional[Dict] = None,
-        image_url: Optional[str] = None
+        image_url: Optional[str] = None,
+        campaign: Optional[NotificationCampaign] = None
     ) -> Dict:
         """
         Envía una notificación a todos los dispositivos activos de un usuario.
@@ -74,7 +75,8 @@ class NotificationService:
                 notification_type=notification_type,
                 title=title,
                 body=body,
-                data=data
+                data=data,
+                campaign=campaign
             )
 
             # Obtener lista de tokens
@@ -126,21 +128,47 @@ class NotificationService:
         body: str,
         notification_type: str = 'CUSTOM',
         data: Optional[Dict] = None,
-        image_url: Optional[str] = None
+        image_url: Optional[str] = None,
+        campaign_title: Optional[str] = None,
+        campaign_description: Optional[str] = None,
+        created_by: Optional[User] = None
     ) -> Dict:
         """
-        Envía una notificación a múltiples usuarios.
+        Envía una notificación a múltiples usuarios y crea una campaña para rastrear.
         
+        Args:
+            users: Lista de usuarios destinatarios
+            title: Título de la notificación
+            body: Cuerpo del mensaje
+            notification_type: Tipo de notificación
+            data: Datos adicionales
+            image_url: URL de imagen
+            campaign_title: Título de la campaña (opcional)
+            campaign_description: Descripción de la campaña (opcional)
+            created_by: Usuario que crea la campaña (opcional)
+            
         Returns:
             Dict con estadísticas agregadas del envío
         """
+        # Crear campaña si se especifica título
+        campaign = None
+        if campaign_title:
+            campaign = NotificationCampaign.objects.create(
+                title=campaign_title,
+                description=campaign_description,
+                campaign_type=NotificationCampaign.CampaignType.MANUAL,
+                created_by=created_by,
+                total_users=len(users)
+            )
+
         results = {
             'total_users': len(users),
             'successful_users': 0,
             'failed_users': 0,
             'total_devices': 0,
             'successful_sends': 0,
-            'failed_sends': 0
+            'failed_sends': 0,
+            'campaign_id': campaign.id if campaign else None
         }
 
         for user in users:
@@ -150,7 +178,8 @@ class NotificationService:
                 body=body,
                 notification_type=notification_type,
                 data=data,
-                image_url=image_url
+                image_url=image_url,
+                campaign=campaign
             )
 
             if result['success']:
@@ -160,6 +189,10 @@ class NotificationService:
                 results['failed_sends'] += result.get('failure_count', 0)
             else:
                 results['failed_users'] += 1
+
+        # Actualizar estadísticas de la campaña
+        if campaign:
+            campaign.update_statistics()
 
         return results
 
@@ -258,20 +291,28 @@ class NotificationService:
         user: User,
         token: str,
         platform: str = 'WEB',
-        device_name: Optional[str] = None
+        device_name: Optional[str] = None,
+        validate_token: bool = True
     ) -> DeviceToken:
         """
         Registra o actualiza un token de dispositivo para un usuario.
-        
+
         Args:
             user: Usuario propietario del dispositivo
             token: Token FCM del dispositivo
             platform: Plataforma (ANDROID, IOS, WEB)
             device_name: Nombre descriptivo del dispositivo
-            
+            validate_token: Si validar el token enviando una notificación de prueba
+
         Returns:
             Instancia de DeviceToken
         """
+        # Validar token si se solicita
+        if validate_token:
+            validation_result = NotificationService.validate_fcm_token(token)
+            if not validation_result['valid']:
+                raise ValueError(f"Token FCM inválido: {validation_result.get('error', 'Desconocido')}")
+
         device_token, created = DeviceToken.objects.update_or_create(
             token=token,
             defaults={
@@ -289,6 +330,43 @@ class NotificationService:
             logger.info(f"Dispositivo actualizado para {user.username}: {platform}")
 
         return device_token
+
+    @staticmethod
+    def validate_fcm_token(token: str) -> Dict[str, Any]:
+        """
+        Valida un token FCM enviando una notificación de prueba silenciosa.
+
+        Args:
+            token: Token FCM a validar
+
+        Returns:
+            Dict con resultado de validación
+        """
+        try:
+            # Enviar notificación de prueba con datos vacíos (silenciosa)
+            result = firebase_service.send_multicast_notification(
+                tokens=[token],
+                title='',  # Título vacío para notificación silenciosa
+                body='',
+                data={'type': 'token_validation', 'silent': 'true'},
+                image_url=None
+            )
+
+            if result['success_count'] > 0:
+                return {'valid': True, 'message': 'Token válido'}
+            else:
+                # Verificar si hay errores específicos
+                if result.get('results'):
+                    first_result = result['results'][0]
+                    error = first_result.get('error')
+                    if error:
+                        return {'valid': False, 'error': f'Error FCM: {error}'}
+
+                return {'valid': False, 'error': 'Token rechazado por FCM'}
+
+        except Exception as e:
+            logger.error(f"Error validando token FCM: {str(e)}")
+            return {'valid': False, 'error': f'Error de validación: {str(e)}'}
 
     @staticmethod
     def unregister_device_token(token: str) -> bool:
@@ -407,7 +485,7 @@ def notify_product_low_stock(product):
     )
 
 
-def notify_report_generated(user: User, report_type: str, report_url: str = None):
+def notify_report_generated(user: User, report_type: str, report_url: Optional[str] = None):
     """Notifica cuando se genera un reporte"""
     NotificationService.send_notification_to_user(
         user=user,
