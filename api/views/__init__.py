@@ -5,6 +5,7 @@ from .auth import (
     LogoutView,
     UserProfileView,
     PasswordResetRequestView,  # <-- AÑADIR ESTA LÍNEA
-    PasswordResetConfirmView   # <-- AÑADIR ESTA LÍNEA
+    PasswordResetConfirmView,   # <-- AÑADIR ESTA LÍNEA
+    health_check  # <-- AÑADIR ESTA LÍNEA
 )
 from .user import UserListView, UserDetailView, ClientViewSet

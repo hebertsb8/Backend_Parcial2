@@ -11,7 +11,7 @@ from .views import (
     PasswordResetRequestView,
     PasswordResetConfirmView,
     ClientViewSet,
-    health_check # Import the new ViewSet
+    health_check
 )
 
 # Create a router and register our viewsets with it.
